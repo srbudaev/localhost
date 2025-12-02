@@ -104,6 +104,56 @@ impl ServerManager {
         })
     }
 
+    /// Print information about all running servers
+    pub fn print_server_info(&self) {
+        println!("Localhost HTTP Server v0.1.0");
+        println!("================================");
+        
+        for (idx, instance) in self.server_instances.iter().enumerate() {
+            let server_name = instance.server_name();
+            let address = instance.config().server_address;
+            let ports = instance.ports();
+            let root = instance.root_path().display();
+            
+            println!("\nServer {}: {}", idx, server_name);
+            println!("  Address: {}", address);
+            println!("  Ports: {}", ports.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", "));
+            println!("  Root: {}", root);
+            
+            if instance.is_default() {
+                println!("  Status: Default server for port(s)");
+            }
+            
+            if instance.has_admin_access() {
+                println!("  Admin access: Enabled");
+            }
+            
+            // Print routes
+            if !instance.config().routes.is_empty() {
+                println!("  Routes:");
+                for (path, route) in &instance.config().routes {
+                    let methods = if route.methods.is_empty() {
+                        "ALL".to_string()
+                    } else {
+                        route.methods.join(", ")
+                    };
+                    println!("    {} -> [{}]", path, methods);
+                }
+            }
+            
+            // Print CGI handlers
+            if !instance.config().cgi_handlers.is_empty() {
+                println!("  CGI handlers:");
+                for (ext, interpreter) in &instance.config().cgi_handlers {
+                    println!("    {} -> {}", ext, interpreter);
+                }
+            }
+        }
+        
+        println!("\n================================");
+        println!("Server is running. Press Ctrl+C to stop.\n");
+    }
+
     /// Run the main server loop
     pub fn run(&mut self) -> Result<()> {
         loop {
@@ -391,8 +441,11 @@ impl ServerManager {
 
     /// Close a connection and clean up resources
     fn close_connection(&mut self, fd: i32) -> Result<()> {
-        self.event_manager.unregister_read(fd)?;
-        self.event_manager.unregister_write(fd)?;
+        // Try to unregister events, but ignore errors if they're already unregistered
+        // This can happen during cleanup or when connection is already closed
+        let _ = self.event_manager.unregister_read(fd);
+        let _ = self.event_manager.unregister_write(fd);
+        
         self.connections.remove(&fd);
         self.parsers.remove(&fd);
         Ok(())

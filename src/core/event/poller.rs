@@ -81,20 +81,18 @@ impl Poller {
                 udata: std::ptr::null_mut(),
             };
 
-            if kevent(
+            // Try to unregister the event
+            // If it fails (event doesn't exist, fd is closed, etc.), we silently ignore it
+            // This is safe because unregistering a non-existent event is harmless
+            let _ = kevent(
                 self.kq,
                 &kev as *const KeventStruct,
                 1,
                 std::ptr::null_mut(),
                 0,
                 std::ptr::null(),
-            ) < 0
-            {
-                return Err(ServerError::NetworkError(format!(
-                    "Failed to unregister event for fd {}",
-                    fd
-                )));
-            }
+            );
+            // Always succeed - if event wasn't registered or already removed, that's fine
         }
         Ok(())
     }

@@ -26,7 +26,9 @@ fn main() {
         }
     };
 
-    println!("Server starting...");
+    // Print server information
+    server_manager.print_server_info();
+
     if let Err(e) = server_manager.run() {
         eprintln!("Server error: {}", e);
         std::process::exit(1);
