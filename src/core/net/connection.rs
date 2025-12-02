@@ -2,6 +2,7 @@ use crate::common::buffer::Buffer;
 use crate::common::time::Timeout;
 use crate::core::net::socket::ClientSocket;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionState {
     Reading,
     Writing,

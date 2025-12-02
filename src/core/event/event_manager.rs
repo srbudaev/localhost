@@ -2,14 +2,17 @@
 use crate::common::error::Result;
 use crate::core::event::poller::Poller;
 use std::os::unix::io::RawFd;
+use std::rc::Rc;
 
 pub struct EventManager {
-    poller: Poller,
+    poller: Rc<Poller>,
 }
 
 impl EventManager {
-    pub fn new(poller: Poller) -> Self {
-        Self { poller }
+    pub fn new(poller: &Rc<Poller>) -> Self {
+        Self {
+            poller: Rc::clone(poller),
+        }
     }
 
     pub fn register_read(&self, fd: RawFd, user_data: usize) -> Result<()> {
