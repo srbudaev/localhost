@@ -50,21 +50,12 @@ impl RequestHandler for StaticFileHandler {
             return Ok(response);
         }
 
-        // Check for redirect
-        if let Some(redirect) = self.router.get_redirect(route) {
-            let mut response = Response::found(request.version);
-            response.set_location(redirect);
-            return Ok(response);
-        }
-
         // Resolve file path
         let file_path = self.router.resolve_file_path(request, route)?;
 
         // Check if file exists
         if !file_path.exists() {
-            let mut response = Response::not_found(request.version);
-            response.set_body_str("Not Found");
-            return Ok(response);
+            return Ok(Response::not_found_with_message(request.version, "Not Found"));
         }
 
         // Check if it's a directory
@@ -81,9 +72,7 @@ impl RequestHandler for StaticFileHandler {
             // Return 403 if listing is disabled
 
             // Directory without listing - return 403
-            let mut response = Response::forbidden(request.version);
-            response.set_body_str("Forbidden");
-            return Ok(response);
+            return Ok(Response::forbidden_with_message(request.version, "Forbidden"));
         }
 
         // Serve the file

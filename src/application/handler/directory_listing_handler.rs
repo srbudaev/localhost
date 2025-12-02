@@ -121,16 +121,15 @@ impl RequestHandler for DirectoryListingHandler {
 
         // Verify it's a directory
         if !dir_path.is_dir() {
-            let mut response = Response::not_found(request.version);
-            response.set_body_str("Not Found");
-            return Ok(response);
+            return Ok(Response::not_found_with_message(request.version, "Not Found"));
         }
 
         // Check if directory listing is enabled
         if !self.router.is_directory_listing_enabled(route) {
-            let mut response = Response::forbidden(request.version);
-            response.set_body_str("Directory listing is disabled");
-            return Ok(response);
+            return Ok(Response::forbidden_with_message(
+                request.version,
+                "Directory listing is disabled"
+            ));
         }
 
         // Generate listing

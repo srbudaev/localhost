@@ -1,6 +1,7 @@
 use crate::http::headers::{Headers, names as header_names};
 use crate::http::status::StatusCode;
 use crate::http::version::Version;
+use crate::http::cookie::Cookie;
 use std::time::SystemTime;
 
 /// HTTP response structure
@@ -68,6 +69,59 @@ impl Response {
         Self::new(version, StatusCode::FOUND)
     }
 
+    /// Create a 400 Bad Request response
+    pub fn bad_request(version: Version) -> Self {
+        Self::new(version, StatusCode::BAD_REQUEST)
+    }
+}
+
+// Response builders with messages
+// These helper methods create responses with common status codes and error messages
+impl Response {
+    /// Create a 404 Not Found response with message
+    pub fn not_found_with_message(version: Version, message: &str) -> Self {
+        let mut response = Self::not_found(version);
+        response.set_body_str(message);
+        response
+    }
+
+    /// Create a 403 Forbidden response with message
+    pub fn forbidden_with_message(version: Version, message: &str) -> Self {
+        let mut response = Self::forbidden(version);
+        response.set_body_str(message);
+        response
+    }
+
+    /// Create a 405 Method Not Allowed response with message
+    pub fn method_not_allowed_with_message(version: Version, message: &str) -> Self {
+        let mut response = Self::method_not_allowed(version);
+        response.set_body_str(message);
+        response
+    }
+
+    /// Create a 500 Internal Server Error response with message
+    pub fn internal_error_with_message(version: Version, message: &str) -> Self {
+        let mut response = Self::internal_error(version);
+        response.set_body_str(message);
+        response
+    }
+
+    /// Create a 400 Bad Request response with message
+    pub fn bad_request_with_message(version: Version, message: &str) -> Self {
+        let mut response = Self::bad_request(version);
+        response.set_body_str(message);
+        response
+    }
+
+    /// Create a 504 Gateway Timeout response with message
+    pub fn gateway_timeout_with_message(version: Version, message: &str) -> Self {
+        let mut response = Self::new(version, StatusCode::GATEWAY_TIMEOUT);
+        response.set_body_str(message);
+        response
+    }
+}
+
+impl Response {
     /// Set default headers
     fn set_default_headers(&mut self) {
         // Set Server header
@@ -140,6 +194,27 @@ impl Response {
         } else {
             Some(self.body.len())
         }
+    }
+
+    /// Add a Set-Cookie header
+    pub fn add_cookie(&mut self, cookie: Cookie) {
+        // Set-Cookie can have multiple values, so we use add() instead of set()
+        self.headers.add(
+            header_names::SET_COOKIE.to_string(),
+            cookie.to_set_cookie_string(),
+        );
+    }
+
+    /// Remove a cookie by setting it with Max-Age=0
+    pub fn remove_cookie(&mut self, name: &str, path: Option<&str>) {
+        let mut cookie = Cookie::new(name.to_string(), "".to_string())
+            .set_max_age(0);
+        
+        if let Some(path) = path {
+            cookie = cookie.set_path(path.to_string());
+        }
+        
+        self.add_cookie(cookie);
     }
 }
 

@@ -12,4 +12,8 @@ pub use router::Router;
 pub use request_handler::RequestHandler;
 pub use static_file_handler::StaticFileHandler;
 pub use directory_listing_handler::DirectoryListingHandler;
+pub use redirection_handler::RedirectionHandler;
+pub use error_page_handler::ErrorPageHandler;
+pub use upload_handler::UploadHandler;
 pub use cgi_handler::CgiHandler;
+pub use session_manager::{SessionManager, Session, SessionData};

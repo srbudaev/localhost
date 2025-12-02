@@ -1,6 +1,7 @@
 use crate::http::headers::Headers;
 use crate::http::method::Method;
 use crate::http::version::Version;
+use crate::http::cookie::parse_cookie_header;
 use std::collections::HashMap;
 
 /// HTTP request structure
@@ -120,6 +121,19 @@ impl Request {
     /// Get Content-Type header value
     pub fn content_type(&self) -> Option<&String> {
         self.headers.get("Content-Type")
+    }
+
+    /// Get all cookies from Cookie header
+    pub fn cookies(&self) -> HashMap<String, String> {
+        self.headers
+            .get("Cookie")
+            .map(|header| parse_cookie_header(header))
+            .unwrap_or_default()
+    }
+
+    /// Get a specific cookie value by name
+    pub fn cookie(&self, name: &str) -> Option<String> {
+        self.cookies().get(name).cloned()
     }
 }
 

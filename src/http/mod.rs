@@ -15,3 +15,4 @@ pub use version::Version;
 pub use headers::{Headers, names as header_names};
 pub use request::Request;
 pub use response::Response;
+pub use cookie::{Cookie, SameSite, parse_cookie_header};

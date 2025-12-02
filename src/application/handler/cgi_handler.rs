@@ -6,7 +6,6 @@ use crate::common::constants::DEFAULT_REQUEST_TIMEOUT_SECS;
 use crate::common::error::{Result, ServerError};
 use crate::http::request::Request;
 use crate::http::response::Response;
-use crate::http::status::StatusCode;
 use std::path::PathBuf;
 
 /// Handler for executing CGI scripts
@@ -48,8 +47,10 @@ impl CgiHandler {
         }
 
         // Check if file extension matches any configured CGI handler
+        // CGI handlers in config use format ".py", ".sh", etc.
         if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
-            return self.server_config.cgi_handlers.contains_key(ext);
+            let ext_with_dot = format!(".{}", ext);
+            return self.server_config.cgi_handlers.contains_key(&ext_with_dot);
         }
 
         false
@@ -69,16 +70,18 @@ impl RequestHandler for CgiHandler {
 
         // Verify script exists
         if !script_path.exists() {
-            let mut response = Response::not_found(request.version);
-            response.set_body_str("CGI script not found");
-            return Ok(response);
+            return Ok(Response::not_found_with_message(
+                request.version,
+                "CGI script not found"
+            ));
         }
 
         // Check if this is a CGI script
         if !self.is_cgi_script(route, &script_path) {
-            let mut response = Response::forbidden(request.version);
-            response.set_body_str("Not a CGI script");
-            return Ok(response);
+            return Ok(Response::forbidden_with_message(
+                request.version,
+                "Not a CGI script"
+            ));
         }
 
         // Get interpreter for script
@@ -94,14 +97,16 @@ impl RequestHandler for CgiHandler {
         ) {
             Ok(response) => Ok(response),
             Err(ServerError::CgiError(msg)) => {
-                let mut response = Response::internal_error(request.version);
-                response.set_body_str(&format!("CGI Error: {}", msg));
-                Ok(response)
+                Ok(Response::internal_error_with_message(
+                    request.version,
+                    &format!("CGI Error: {}", msg)
+                ))
             }
             Err(ServerError::TimeoutError(msg)) => {
-                let mut response = Response::new(request.version, StatusCode::GATEWAY_TIMEOUT);
-                response.set_body_str(&format!("CGI Timeout: {}", msg));
-                Ok(response)
+                Ok(Response::gateway_timeout_with_message(
+                    request.version,
+                    &format!("CGI Timeout: {}", msg)
+                ))
             }
             Err(e) => Err(e),
         }

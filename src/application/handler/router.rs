@@ -20,6 +20,15 @@ impl Router {
         }
     }
 
+    /// Resolve path - if absolute/relative use as-is, otherwise join with root
+    pub fn resolve_path(&self, path: &str) -> PathBuf {
+        if path.starts_with('/') || path.starts_with("./") {
+            PathBuf::from(path)
+        } else {
+            self.root_path.join(path)
+        }
+    }
+
     /// Match a request to a route and return the route configuration
     pub fn match_route(&self, request: &Request) -> Option<&RouteConfig> {
         let path = request.path();
@@ -62,9 +71,10 @@ impl Router {
             .ok_or_else(|| ServerError::HttpError("No matching route".to_string()))?;
 
         if !self.is_method_allowed(request, route) {
-            let mut response = Response::method_not_allowed(request.version);
-            response.set_body_str("Method Not Allowed");
-            return Ok((route, Some(response)));
+            return Ok((route, Some(Response::method_not_allowed_with_message(
+                request.version,
+                "Method Not Allowed"
+            ))));
         }
 
         Ok((route, None))
@@ -76,14 +86,7 @@ impl Router {
 
         // If route has filename, use it
         if let Some(ref filename) = route.filename {
-            let file_path = if filename.starts_with('/') || filename.starts_with("./") {
-                // Absolute or relative path
-                PathBuf::from(filename)
-            } else {
-                // Relative to root
-                self.root_path.join(filename)
-            };
-            return Ok(file_path);
+            return Ok(self.resolve_path(filename));
         }
 
         // If route has directory, map path to directory
@@ -101,11 +104,7 @@ impl Router {
                 ""
             };
 
-            let dir_path = if directory.starts_with('/') {
-                PathBuf::from(directory)
-            } else {
-                self.root_path.join(directory)
-            };
+            let dir_path = self.resolve_path(directory);
 
             let file_path = if relative_path.is_empty() {
                 dir_path

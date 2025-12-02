@@ -1,16 +1,18 @@
 use crate::application::config::models::Config;
 use crate::application::handler::request_handler::RequestHandler;
 use crate::application::handler::router::Router;
+use crate::application::handler::session_manager::SessionManager;
 use crate::application::handler::static_file_handler::StaticFileHandler;
 use crate::application::handler::directory_listing_handler::DirectoryListingHandler;
 use crate::application::server::server_instance::ServerInstance;
-use crate::common::constants::DEFAULT_BUFFER_SIZE;
+use crate::common::constants::{DEFAULT_BUFFER_SIZE, DEFAULT_SESSION_TIMEOUT_SECS};
 use crate::common::error::{Result, ServerError};
 use crate::core::event::event_loop::EventLoop;
 use crate::core::event::event_manager::EventManager;
 use crate::core::event::poller::Kevent;
 use crate::core::net::connection::{Connection, ConnectionState};
 use crate::core::net::io::{read_non_blocking, write_non_blocking};
+use crate::http::cookie::Cookie;
 use crate::http::parser::RequestParser;
 use crate::http::request::Request;
 use crate::http::response::Response;
@@ -43,6 +45,9 @@ pub struct ServerManager {
 
     /// Listener FD to (server_index, address, port) mapping
     listener_to_server: HashMap<i32, (usize, SocketAddr, u16)>,
+
+    /// Session manager for handling HTTP sessions
+    session_manager: SessionManager,
 }
 
 impl ServerManager {
@@ -101,6 +106,7 @@ impl ServerManager {
             parsers: HashMap::new(),
             listener_to_server,
             server_instances,
+            session_manager: SessionManager::new(DEFAULT_SESSION_TIMEOUT_SECS),
         })
     }
 
@@ -223,21 +229,26 @@ impl ServerManager {
     }
 
     /// Get connection or return error
+    /// Helper to create "not found" error for resources
+    fn not_found_error(resource: &str, id: i32) -> ServerError {
+        ServerError::NetworkError(format!("{} {} not found", resource, id))
+    }
+
     fn get_connection(&self, fd: i32) -> Result<&Connection> {
         self.connections.get(&fd)
-            .ok_or_else(|| ServerError::NetworkError(format!("Connection {} not found", fd)))
+            .ok_or_else(|| Self::not_found_error("Connection", fd))
     }
 
     /// Get mutable connection or return error
     fn get_connection_mut(&mut self, fd: i32) -> Result<&mut Connection> {
         self.connections.get_mut(&fd)
-            .ok_or_else(|| ServerError::NetworkError(format!("Connection {} not found", fd)))
+            .ok_or_else(|| Self::not_found_error("Connection", fd))
     }
 
     /// Get parser or return error
     fn get_parser_mut(&mut self, fd: i32) -> Result<&mut RequestParser> {
         self.parsers.get_mut(&fd)
-            .ok_or_else(|| ServerError::NetworkError(format!("Parser {} not found", fd)))
+            .ok_or_else(|| Self::not_found_error("Parser", fd))
     }
 
     /// Handle event on a client connection
@@ -302,39 +313,89 @@ impl ServerManager {
         // Determine which handler to use based on route
         let route = router.match_route(&request);
         let response = if let Some(route) = route {
-            let file_path = router.resolve_file_path(&request, route)?;
-            
-            // Check if this is a CGI script
-            let is_cgi = route.cgi_extension.is_some() 
-                || (file_path.extension()
-                    .and_then(|e| e.to_str())
-                    .map(|ext| server_instance.config().cgi_handlers.contains_key(ext))
-                    .unwrap_or(false));
-
-            if is_cgi && file_path.exists() && file_path.is_file() {
-                // Execute CGI script
-                use crate::application::handler::cgi_handler::CgiHandler;
-                let cgi_handler = CgiHandler::new(
-                    router,
-                    server_instance.config().clone(),
-                    server_instance.ports()[0], // Use first port
-                );
-                cgi_handler.handle(&request)?
-            } else if file_path.is_dir() && router.is_directory_listing_enabled(route) {
-                // Directory listing
-                let handler = DirectoryListingHandler::new(router);
+            // Check for redirect first (highest priority)
+            if route.redirect.is_some() {
+                use crate::application::handler::redirection_handler::RedirectionHandler;
+                let handler = RedirectionHandler::new(router);
+                handler.handle(&request)?
+            } else if route.upload_dir.is_some() && request.method == crate::http::method::Method::POST {
+                // File upload - check upload_dir before other handlers
+                use crate::application::handler::upload_handler::UploadHandler;
+                let upload_dir = if let Some(ref dir) = route.upload_dir {
+                    router.resolve_path(dir)
+                } else {
+                    return Err(ServerError::HttpError("Upload directory not configured".to_string()));
+                };
+                let handler = UploadHandler::new(router, upload_dir);
                 handler.handle(&request)?
             } else {
-                // Static file
-                let handler = StaticFileHandler::new(router);
-                handler.handle(&request)?
+                let file_path = router.resolve_file_path(&request, route)?;
+                
+                // Check if this is a CGI script
+                let is_cgi = route.cgi_extension.is_some() 
+                    || (file_path.extension()
+                        .and_then(|e| e.to_str())
+                        .map(|ext| {
+                            let ext_with_dot = format!(".{}", ext);
+                            server_instance.config().cgi_handlers.contains_key(&ext_with_dot)
+                        })
+                        .unwrap_or(false));
+
+                if is_cgi && file_path.exists() && file_path.is_file() {
+                    // Execute CGI script
+                    use crate::application::handler::cgi_handler::CgiHandler;
+                    let cgi_handler = CgiHandler::new(
+                        router,
+                        server_instance.config().clone(),
+                        server_instance.ports()[0], // Use first port
+                    );
+                    cgi_handler.handle(&request)?
+                } else if file_path.is_dir() && router.is_directory_listing_enabled(route) {
+                    // Directory listing
+                    let handler = DirectoryListingHandler::new(router);
+                    handler.handle(&request)?
+                } else {
+                    // Static file
+                    let handler = StaticFileHandler::new(router);
+                    handler.handle(&request)?
+                }
             }
         } else {
-            // No route matched - return 404
-            let mut response = Response::not_found(request.version);
-            response.set_body_str("Not Found");
-            response
+            // No route matched - return 404 with custom error page if configured
+            self.generate_error_response(
+                server_instance,
+                crate::http::status::StatusCode::NOT_FOUND,
+                request.version,
+            )?
         };
+
+        // Handle session management - get or create session
+        let mut response = response;
+        let session_id = request.cookie(self.session_manager.cookie_name());
+        let session_id = self.session_manager.get_or_create_session(session_id.as_deref());
+        
+        if let Some(sid) = session_id {
+            // Set session cookie in response
+            let cookie = Cookie::new(
+                self.session_manager.cookie_name().to_string(),
+                sid.clone(),
+            )
+            .set_path("/".to_string())
+            .set_http_only(true)
+            .set_max_age(self.session_manager.timeout_secs());
+            
+            response.add_cookie(cookie);
+        }
+
+        // Cleanup expired sessions periodically (every 100 requests - simplified)
+        // In production, use a background task or timer
+        static mut CLEANUP_COUNTER: u64 = 0;
+        unsafe {
+            CLEANUP_COUNTER += 1;
+            if CLEANUP_COUNTER % 100 == 0 {
+                self.session_manager.cleanup_expired();
+            }
+        }
 
         // Serialize response
         let response_bytes = ResponseSerializer::serialize_auto(&response)?;
@@ -351,6 +412,21 @@ impl ServerManager {
         self.event_manager.register_write(fd, fd as usize)?;
 
         Ok(())
+    }
+
+    /// Generate error response with custom error page if configured
+    fn generate_error_response(
+        &self,
+        server_instance: &ServerInstance,
+        status_code: crate::http::status::StatusCode,
+        version: crate::http::version::Version,
+    ) -> Result<Response> {
+        use crate::application::handler::error_page_handler::ErrorPageHandler;
+        let error_handler = ErrorPageHandler::new(
+            server_instance.config(),
+            server_instance.root_path().clone(),
+        );
+        error_handler.generate_error_response(status_code, version)
     }
 
     /// Find server instance for a request based on Host header

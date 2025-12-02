@@ -7,11 +7,8 @@ use std::io::Write;
 pub struct ResponseSerializer;
 
 impl ResponseSerializer {
-    /// Serialize response to bytes
-    pub fn serialize(response: &Response) -> Result<Vec<u8>> {
-        let mut buffer = Vec::new();
-
-        // Status line
+    /// Write status line to buffer
+    fn write_status_line(buffer: &mut Vec<u8>, response: &Response) -> Result<()> {
         write!(
             buffer,
             "{} {} {}{}",
@@ -21,6 +18,15 @@ impl ResponseSerializer {
             CRLF
         )
         .map_err(|e| ServerError::HttpError(format!("Failed to write status line: {}", e)))?;
+        Ok(())
+    }
+
+    /// Serialize response to bytes
+    pub fn serialize(response: &Response) -> Result<Vec<u8>> {
+        let mut buffer = Vec::new();
+
+        // Status line
+        Self::write_status_line(&mut buffer, response)?;
 
         // Headers
         let headers_str = response.headers.to_string();
@@ -42,15 +48,7 @@ impl ResponseSerializer {
         let mut buffer = Vec::new();
 
         // Status line
-        write!(
-            buffer,
-            "{} {} {}{}",
-            response.version,
-            response.status,
-            response.status.reason_phrase(),
-            CRLF
-        )
-        .map_err(|e| ServerError::HttpError(format!("Failed to write status line: {}", e)))?;
+        Self::write_status_line(&mut buffer, response)?;
 
         // Headers
         let headers_str = response.headers.to_string();
