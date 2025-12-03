@@ -10,3 +10,5 @@ pub const CRLF_BYTES: &[u8] = b"\r\n";
 
 pub const DEFAULT_ERROR_PAGES: &[u16] = &[400, 403, 404, 405, 413, 500];
 
+pub const DEFAULT_SESSION_TIMEOUT_SECS: u64 = 3600; // 1 hour
+

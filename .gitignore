@@ -23,3 +23,20 @@ Thumbs.db
 # Logs
 *.log
 
+# Configuration files (keep example)
+config.toml
+!config.example.toml
+
+# Server directories (keep structure, ignore content)
+root/*
+!root/.gitkeep
+!root/index.html
+static/*
+!static/.gitkeep
+cgi-bin/*
+!cgi-bin/.gitkeep
+!cgi-bin/test.py
+uploads/*
+!uploads/.gitkeep
+errors/*
+!errors/.gitkeep

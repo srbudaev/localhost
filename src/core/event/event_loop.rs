@@ -2,22 +2,23 @@
 use crate::common::error::Result;
 use crate::core::event::poller::Poller;
 use libc::kevent;
+use std::rc::Rc;
 
 pub struct EventLoop {
-    poller: Poller,
+    poller: Rc<Poller>,
     events: Vec<kevent>,
 }
 
 impl EventLoop {
     pub fn new() -> Result<Self> {
-        let poller = Poller::new()?;
+        let poller = Rc::new(Poller::new()?);
         Ok(Self {
             poller,
             events: vec![unsafe { std::mem::zeroed() }; 1024],
         })
     }
 
-    pub fn poller(&self) -> &Poller {
+    pub fn poller(&self) -> &Rc<Poller> {
         &self.poller
     }
 
