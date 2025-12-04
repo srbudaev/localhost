@@ -75,4 +75,7 @@ redirect = "/new"
 "405" = { filename = "errors/405.html" }
 "413" = { filename = "errors/413.html" }
 "500" = { filename = "errors/500.html" }
+"401" = { filename = "errors/401.html" }
+"408" = { filename = "errors/408.html" }
+"501" = { filename = "errors/501.html" }
 
