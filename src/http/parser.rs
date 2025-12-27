@@ -26,23 +26,41 @@ pub struct RequestParser {
     request: Option<Request>,
     expected_body_size: Option<usize>,
     header_lines: Vec<String>,
+    max_body_size: usize,
+    current_body_size: usize,
 }
 
 impl RequestParser {
-    /// Create a new parser
+    /// Create a new parser with default max body size
     pub fn new() -> Self {
+        Self::with_max_body_size(crate::common::constants::DEFAULT_MAX_BODY_SIZE)
+    }
+
+    /// Create a new parser with specified max body size
+    pub fn with_max_body_size(max_body_size: usize) -> Self {
         Self {
             state: ParseState::RequestLine,
             buffer: Buffer::new(),
             request: None,
             expected_body_size: None,
             header_lines: Vec::new(),
+            max_body_size,
+            current_body_size: 0,
         }
     }
 
     /// Add data to parser buffer
-    pub fn add_data(&mut self, data: &[u8]) {
+    pub fn add_data(&mut self, data: &[u8]) -> Result<()> {
+        // Check if adding this data would exceed max body size
+        // We check buffer size + current body size to prevent memory exhaustion
+        if self.buffer.len() + self.current_body_size + data.len() > self.max_body_size {
+            return Err(ServerError::HttpError(format!(
+                "Request body size would exceed maximum allowed size {}",
+                self.max_body_size
+            )));
+        }
         self.buffer.extend(data);
+        Ok(())
     }
 
     /// Parse available data
@@ -60,7 +78,7 @@ impl RequestParser {
                 ParseState::Headers => {
                     if self.parse_headers()? {
                         self.state = ParseState::Body;
-                        self.prepare_body_parsing();
+                        self.prepare_body_parsing()?;
                     } else {
                         return Ok(None); // Need more data
                     }
@@ -148,7 +166,7 @@ impl RequestParser {
     }
 
     /// Prepare for body parsing
-    fn prepare_body_parsing(&mut self) {
+    fn prepare_body_parsing(&mut self) -> Result<()> {
         if let Some(ref mut request) = self.request {
             // Parse headers
             if let Ok(headers) = Headers::from_lines(&self.header_lines) {
@@ -158,11 +176,18 @@ impl RequestParser {
             // Check for chunked encoding
             if request.is_chunked() {
                 self.state = ParseState::ChunkedBody;
-                return;
+                return Ok(());
             }
 
             // Get Content-Length
             if let Some(length) = request.content_length() {
+                // Check if body size exceeds limit
+                if length > self.max_body_size {
+                    return Err(ServerError::HttpError(format!(
+                        "Request body size {} exceeds maximum allowed size {}",
+                        length, self.max_body_size
+                    )));
+                }
                 self.expected_body_size = Some(length);
             } else if request.method.allows_body() {
                 // No Content-Length and method allows body - assume no body
@@ -171,6 +196,7 @@ impl RequestParser {
                 self.expected_body_size = Some(0);
             }
         }
+        Ok(())
     }
 
     /// Parse body with Content-Length
@@ -178,8 +204,27 @@ impl RequestParser {
         if let Some(expected_size) = self.expected_body_size {
             if let Some(ref mut request) = self.request {
                 let available = self.buffer.len();
+                
+                // Check if we're exceeding max body size
+                if self.current_body_size + available > self.max_body_size {
+                    return Err(ServerError::HttpError(format!(
+                        "Request body size exceeds maximum allowed size {}",
+                        self.max_body_size
+                    )));
+                }
+                
                 if available >= expected_size {
                     let body = self.buffer.drain(expected_size);
+                    self.current_body_size += body.len();
+                    
+                    // Final check
+                    if self.current_body_size > self.max_body_size {
+                        return Err(ServerError::HttpError(format!(
+                            "Request body size {} exceeds maximum allowed size {}",
+                            self.current_body_size, self.max_body_size
+                        )));
+                    }
+                    
                     request.body = body;
                     return Ok(true);
                 }
@@ -210,13 +255,31 @@ impl RequestParser {
                         if self.buffer.len() >= CRLF_BYTES.len() {
                             self.buffer.drain(CRLF_BYTES.len());
                         }
+                        
+                        // Final check for max body size
+                        if self.current_body_size > self.max_body_size {
+                            return Err(ServerError::HttpError(format!(
+                                "Request body size {} exceeds maximum allowed size {}",
+                                self.current_body_size, self.max_body_size
+                            )));
+                        }
+                        
                         request.body = body;
                         return Ok(true);
+                    }
+
+                    // Check if adding this chunk would exceed max body size
+                    if self.current_body_size + chunk_size > self.max_body_size {
+                        return Err(ServerError::HttpError(format!(
+                            "Request body size would exceed maximum allowed size {}",
+                            self.max_body_size
+                        )));
                     }
 
                     // Read chunk data
                     if self.buffer.len() >= chunk_size + CRLF_BYTES.len() {
                         let chunk_data = self.buffer.drain(chunk_size);
+                        self.current_body_size += chunk_data.len();
                         body.extend_from_slice(&chunk_data);
                         // Skip CRLF after chunk
                         self.buffer.drain(CRLF_BYTES.len());
@@ -239,6 +302,7 @@ impl RequestParser {
         self.request = None;
         self.expected_body_size = None;
         self.header_lines.clear();
+        self.current_body_size = 0;
     }
 
     /// Check if parser is in error state
