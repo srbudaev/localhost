@@ -48,6 +48,9 @@ pub struct ServerManager {
 
     /// Session manager for handling HTTP sessions
     session_manager: SessionManager,
+
+    /// Maximum client body size from configuration
+    max_body_size: usize,
 }
 
 impl ServerManager {
@@ -59,33 +62,104 @@ impl ServerManager {
 
         let mut server_instances = Vec::new();
         let mut default_servers = HashMap::new();
+        let mut errors = Vec::new();
 
         // First pass: create all server instances and determine defaults
+        // Collect errors but continue creating other servers
         for (idx, server_config) in config.servers.iter().enumerate() {
-            // First server for each port becomes default
+            // Determine if this should be default for its ports BEFORE creating
+            // (we need to check original config ports, not instance ports)
             let mut is_default = false;
             for port in &server_config.ports {
                 if !default_servers.contains_key(port) {
-                    default_servers.insert(*port, idx);
+                    // Will set to actual index after we know if creation succeeds
                     is_default = true;
                 }
             }
+            
+            match ServerInstance::new(server_config.clone(), is_default) {
+                Ok(instance) => {
+                    // Update default_servers with actual index in server_instances
+                    for port in instance.ports() {
+                        if !default_servers.contains_key(&port) {
+                            default_servers.insert(port, server_instances.len());
+                        }
+                    }
+                    server_instances.push(instance);
+                }
+                Err(e) => {
+                    let error_msg = format!(
+                        "Failed to create server instance {} (server_name: {:?}): {}",
+                        idx,
+                        server_config.server_name,
+                        e
+                    );
+                    errors.push(error_msg.clone());
+                    crate::common::logger::Logger::error(&error_msg);
+                    // Continue with next server
+                }
+            }
+        }
 
-            let instance = ServerInstance::new(server_config.clone(), is_default)?;
-            server_instances.push(instance);
+        // Check if we have at least one server instance
+        if server_instances.is_empty() {
+            let error_msg = format!(
+                "Failed to create any server instances. Errors: {}",
+                errors.join("; ")
+            );
+            return Err(ServerError::ConfigError(error_msg));
+        }
+
+        // Log errors but continue if we have at least one working server
+        if !errors.is_empty() {
+            crate::common::logger::Logger::error(&format!(
+                "Some server instances failed to start. Errors: {}",
+                errors.join("; ")
+            ));
         }
 
         // Second pass: register listeners with event loop
+        // Collect registration errors but continue
         let mut listener_to_server = HashMap::new();
+        let mut registration_errors = Vec::new();
+        
         for (idx, instance) in server_instances.iter().enumerate() {
             for port in instance.ports() {
                 let addr = SocketAddr::new(instance.config().server_address, port);
                 if let Some(listener) = instance.listener(port) {
                     let fd = listener.as_raw_fd();
-                    listener_to_server.insert(fd, (idx, addr, port));
-                    event_manager.register_read(fd, fd as usize)?;
+                    match event_manager.register_read(fd, fd as usize) {
+                        Ok(_) => {
+                            listener_to_server.insert(fd, (idx, addr, port));
+                        }
+                        Err(e) => {
+                            let error_msg = format!(
+                                "Failed to register listener for server {} on port {}: {}",
+                                idx, port, e
+                            );
+                            registration_errors.push(error_msg.clone());
+                            crate::common::logger::Logger::error(&error_msg);
+                            // Continue with next listener
+                        }
+                    }
                 }
             }
+        }
+
+        // Log registration errors but continue if we have at least one listener
+        if !registration_errors.is_empty() && listener_to_server.is_empty() {
+            let error_msg = format!(
+                "Failed to register any listeners. Errors: {}",
+                registration_errors.join("; ")
+            );
+            return Err(ServerError::NetworkError(error_msg));
+        }
+
+        if !registration_errors.is_empty() {
+            crate::common::logger::Logger::error(&format!(
+                "Some listeners failed to register. Errors: {}",
+                registration_errors.join("; ")
+            ));
         }
 
         // Build servers map from instances
@@ -107,6 +181,7 @@ impl ServerManager {
             listener_to_server,
             server_instances,
             session_manager: SessionManager::new(DEFAULT_SESSION_TIMEOUT_SECS),
+            max_body_size: config.client_max_body_size,
         })
     }
 
@@ -183,16 +258,36 @@ impl ServerManager {
 
             // Second pass: process listener events
             for (fd, _server_idx, addr, port) in listener_events {
-                self.handle_listener_event(fd, addr, port)?;
+                if let Err(e) = self.handle_listener_event(fd, addr, port) {
+                    // Log error but continue processing other events
+                    crate::common::logger::Logger::error(&format!(
+                        "Error handling listener event for fd {}: {}",
+                        fd, e
+                    ));
+                }
             }
 
             // Third pass: process client events
             for (fd, event) in client_events {
-                self.handle_client_event(fd, &event)?;
+                if let Err(e) = self.handle_client_event(fd, &event) {
+                    // Log error but continue processing other events
+                    // Note: handle_client_event should not return errors for client events
+                    // as errors are handled internally, but we log just in case
+                    crate::common::logger::Logger::error(&format!(
+                        "Unexpected error handling client event for fd {}: {}",
+                        fd, e
+                    ));
+                }
             }
 
             // Clean up timed out connections
-            self.cleanup_connections()?;
+            if let Err(e) = self.cleanup_connections() {
+                // Log cleanup errors but don't stop server
+                crate::common::logger::Logger::error(&format!(
+                    "Error during connection cleanup: {}",
+                    e
+                ));
+            }
         }
     }
 
@@ -211,17 +306,39 @@ impl ServerManager {
                 .and_then(|instance| instance.listener(port));
 
             if let Some(listener) = listener {
-                if let Some(client_socket) = listener.accept()? {
-                    let client_fd = client_socket.as_raw_fd();
-                    let connection = Connection::new(client_socket, 30); // 30 second timeout
-                    let parser = RequestParser::new();
+                match listener.accept() {
+                    Ok(Some(client_socket)) => {
+                        let client_fd = client_socket.as_raw_fd();
+                        let connection = Connection::new(client_socket, 30); // 30 second timeout
+                        let parser = RequestParser::with_max_body_size(self.max_body_size);
 
-                    self.connections.insert(client_fd, connection);
-                    self.parsers.insert(client_fd, parser);
+                        self.connections.insert(client_fd, connection);
+                        self.parsers.insert(client_fd, parser);
 
-                    // Register client socket for read events
-                    self.event_manager
-                        .register_read(client_fd, client_fd as usize)?;
+                        // Register client socket for read events
+                        if let Err(e) = self.event_manager.register_read(client_fd, client_fd as usize) {
+                            // Failed to register - clean up connection
+                            self.connections.remove(&client_fd);
+                            self.parsers.remove(&client_fd);
+                            crate::common::logger::Logger::error(&format!(
+                                "Failed to register read event for new connection fd {}: {}",
+                                client_fd, e
+                            ));
+                            return Err(e);
+                        }
+                    }
+                    Ok(None) => {
+                        // No connection available (non-blocking accept)
+                        // This is normal, just return
+                    }
+                    Err(e) => {
+                        // Error accepting connection - log but don't crash
+                        crate::common::logger::Logger::error(&format!(
+                            "Error accepting connection on listener fd {}: {}",
+                            fd, e
+                        ));
+                        return Err(e);
+                    }
                 }
             }
         }
@@ -254,20 +371,38 @@ impl ServerManager {
     /// Handle event on a client connection
     fn handle_client_event(&mut self, fd: i32, _event: &Kevent) -> Result<()> {
         // Get connection state first to avoid borrow issues
-        let state = {
-            let connection = self.get_connection(fd)?;
-            connection.state().clone()
+        let state = match self.get_connection(fd) {
+            Ok(connection) => connection.state().clone(),
+            Err(_) => {
+                // Connection not found - already closed, ignore
+                return Ok(());
+            }
         };
 
         match state {
             ConnectionState::Reading => {
-                self.handle_read(fd)?;
+                if let Err(e) = self.handle_read(fd) {
+                    // Error already handled in handle_read (connection closed)
+                    // Log error but don't propagate to avoid breaking event loop
+                    crate::common::logger::Logger::error(&format!(
+                        "Error handling read event for fd {}: {}",
+                        fd, e
+                    ));
+                }
             }
             ConnectionState::Writing => {
-                self.handle_write(fd)?;
+                if let Err(e) = self.handle_write(fd) {
+                    // Error already handled in handle_write (connection closed)
+                    // Log error but don't propagate to avoid breaking event loop
+                    crate::common::logger::Logger::error(&format!(
+                        "Error handling write event for fd {}: {}",
+                        fd, e
+                    ));
+                }
             }
             ConnectionState::Closed => {
-                self.close_connection(fd)?;
+                // Connection already marked as closed - clean it up
+                let _ = self.close_connection(fd);
             }
         }
 
@@ -278,24 +413,59 @@ impl ServerManager {
     fn handle_read(&mut self, fd: i32) -> Result<()> {
         // Read data from socket
         let mut buf = vec![0u8; DEFAULT_BUFFER_SIZE];
-        let n = {
+        let n = match {
             let connection = self.get_connection_mut(fd)?;
-            read_non_blocking(connection.socket_mut(), &mut buf)?
+            read_non_blocking(connection.socket_mut(), &mut buf)
+        } {
+            Ok(n) => n,
+            Err(e) => {
+                // I/O error occurred - close connection
+                self.close_connection_on_error(fd)?;
+                return Err(e);
+            }
         };
 
         if n == 0 {
-            // Connection closed by client
-            self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
+            // Connection closed by client (EOF)
+            self.close_connection_on_error(fd)?;
             return Ok(());
         }
 
         // Add data to parser
-        self.get_parser_mut(fd)?.add_data(&buf[..n]);
+        if let Err(e) = self.get_parser_mut(fd)?.add_data(&buf[..n]) {
+            // Body size error - send 413 response
+            if Self::is_body_size_error(&e) {
+                return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
+            }
+            // Other error - close connection
+            self.close_connection_on_error(fd)?;
+            return Err(e);
+        }
 
         // Try to parse request
-        if let Some(request) = self.get_parser_mut(fd)?.parse()? {
-            // Request parsed successfully - process it
-            self.process_request(fd, request)?;
+        match self.get_parser_mut(fd)?.parse() {
+            Ok(Some(request)) => {
+                // Request parsed successfully - process it
+                if let Err(e) = self.process_request(fd, request) {
+                    // Error processing request - close connection
+                    self.close_connection_on_error(fd)?;
+                    return Err(e);
+                }
+            }
+            Ok(None) => {
+                // Need more data - continue reading
+            }
+            Err(e) => {
+                // Check if it's a body size error
+                if Self::is_body_size_error(&e) {
+                    // Send 413 Payload Too Large response
+                    // Use HTTP/1.1 as default version (we don't have request yet)
+                    return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
+                }
+                // Other parse error - close connection
+                self.close_connection_on_error(fd)?;
+                return Err(e);
+            }
         }
 
         Ok(())
@@ -317,6 +487,11 @@ impl ServerManager {
             if route.redirect.is_some() {
                 use crate::application::handler::redirection_handler::RedirectionHandler;
                 let handler = RedirectionHandler::new(router);
+                handler.handle(&request)?
+            } else if request.method == crate::http::method::Method::DELETE {
+                // DELETE request - handle file deletion
+                use crate::application::handler::delete_handler::DeleteHandler;
+                let handler = DeleteHandler::new(router);
                 handler.handle(&request)?
             } else if route.upload_dir.is_some() && request.method == crate::http::method::Method::POST {
                 // File upload - check upload_dir before other handlers
@@ -414,6 +589,38 @@ impl ServerManager {
         Ok(())
     }
 
+    /// Send error response to client
+    fn send_error_response(
+        &mut self,
+        fd: i32,
+        status_code: crate::http::status::StatusCode,
+        version: crate::http::version::Version,
+    ) -> Result<()> {
+        // Find default server instance for error page
+        let server_instance = self.server_instances.first()
+            .ok_or_else(|| ServerError::HttpError("No server instances available".to_string()))?;
+        
+        // Generate error response
+        let response = self.generate_error_response(server_instance, status_code, version)?;
+        
+        // Serialize response
+        let response_bytes = ResponseSerializer::serialize_auto(&response)?;
+        
+        // Write response to connection buffer
+        {
+            let connection = self.get_connection_mut(fd)?;
+            connection.write_buffer_mut().extend(&response_bytes);
+            connection.set_state(ConnectionState::Writing);
+            // Don't keep connection alive after error
+            connection.set_keep_alive(false);
+        }
+        
+        // Register for write events
+        self.event_manager.register_write(fd, fd as usize)?;
+        
+        Ok(())
+    }
+
     /// Generate error response with custom error page if configured
     fn generate_error_response(
         &self,
@@ -459,39 +666,57 @@ impl ServerManager {
             if write_buffer.is_empty() {
                 // Nothing to write
                 connection.set_state(ConnectionState::Reading);
-                self.event_manager.unregister_write(fd)?;
+                if let Err(e) = self.event_manager.unregister_write(fd) {
+                    // Error unregistering - close connection
+                    connection.set_state(ConnectionState::Closed);
+                    self.close_connection(fd)?;
+                    return Err(e);
+                }
                 return Ok(());
             }
             write_buffer.as_slice()
         };
 
         // Write data
-        let n = {
+        let n = match {
             let socket = connection.socket_mut();
-            write_non_blocking(socket, &data)?
+            write_non_blocking(socket, &data)
+        } {
+            Ok(n) => n,
+            Err(e) => {
+                // I/O error occurred - close connection
+                self.close_connection_on_error(fd)?;
+                return Err(e);
+            }
         };
 
         if n > 0 {
             // Remove written data from buffer
-            connection.write_buffer_mut().drain(n);
+            self.get_connection_mut(fd)?.write_buffer_mut().drain(n);
         }
 
         // Check if all data sent
-        let is_empty = connection.write_buffer().is_empty();
+        let is_empty = self.get_connection(fd)?.write_buffer().is_empty();
         if is_empty {
             // All data sent
-            if connection.should_keep_alive() {
+            let should_keep_alive = self.get_connection(fd)?.should_keep_alive();
+            if should_keep_alive {
                 // Reset for next request
+                let connection = self.get_connection_mut(fd)?;
                 connection.set_state(ConnectionState::Reading);
                 connection.read_buffer_mut().clear();
                 if let Some(parser) = self.parsers.get_mut(&fd) {
                     parser.reset();
                 }
-                self.event_manager.unregister_write(fd)?;
+                if let Err(e) = self.event_manager.unregister_write(fd) {
+                    // Error unregistering - close connection
+                    connection.set_state(ConnectionState::Closed);
+                    self.close_connection(fd)?;
+                    return Err(e);
+                }
             } else {
                 // Close connection
-                connection.set_state(ConnectionState::Closed);
-                self.close_connection(fd)?;
+                self.close_connection_on_error(fd)?;
             }
         }
 
@@ -513,6 +738,23 @@ impl ServerManager {
         }
 
         Ok(())
+    }
+
+    /// Check if error is a body size violation
+    fn is_body_size_error(error: &ServerError) -> bool {
+        if let ServerError::HttpError(ref msg) = error {
+            msg.contains("exceeds maximum allowed size")
+        } else {
+            false
+        }
+    }
+
+    /// Close connection on error - helper to reduce code duplication
+    fn close_connection_on_error(&mut self, fd: i32) -> Result<()> {
+        if let Ok(connection) = self.get_connection_mut(fd) {
+            connection.set_state(ConnectionState::Closed);
+        }
+        self.close_connection(fd)
     }
 
     /// Close a connection and clean up resources
