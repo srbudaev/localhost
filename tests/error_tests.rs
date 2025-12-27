@@ -1,71 +1,16 @@
 // Error handling tests - verify server handles errors gracefully
 
-use std::fs;
-use std::io::{Read, Write};
-use std::net::TcpStream;
-use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use localhost::application::config::models::{Config, ServerConfig, RouteConfig};
-use localhost::application::server::server_manager::ServerManager;
-
-fn create_test_config(port: u16) -> Config {
-    let test_root = std::env::temp_dir().join("localhost_error_test");
-    fs::create_dir_all(&test_root).unwrap();
-    
-    Config {
-        client_timeout_secs: 30,
-        client_max_body_size: 1024,
-        servers: vec![ServerConfig {
-            server_name: "localhost".to_string(),
-            server_address: std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-            ports: vec![port],
-            root: test_root.to_string_lossy().to_string(),
-            routes: vec![RouteConfig {
-                path: "/".to_string(),
-                methods: vec![],
-                redirect: None,
-                root: None,
-                default_file: None,
-                cgi_extension: None,
-                directory_listing: false,
-                upload_dir: None,
-            }],
-            error_pages: std::collections::HashMap::new(),
-            cgi_handlers: std::collections::HashMap::new(),
-            admin_access: false,
-        }],
-        admin: None,
-    }
-}
-
-fn send_request(port: u16, request: &str) -> String {
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
-        .expect("Failed to connect to server");
-    
-    stream.write_all(request.as_bytes()).unwrap();
-    stream.flush().unwrap();
-    
-    let mut response = String::new();
-    stream.read_to_string(&mut response).unwrap();
-    response
-}
-
-fn start_test_server(port: u16) -> thread::JoinHandle<()> {
-    let config = create_test_config(port);
-    let mut server_manager = ServerManager::new(config).unwrap();
-    
-    thread::spawn(move || {
-        let _ = server_manager.run();
-    })
-}
+mod common;
+use common::{create_test_config, send_request, start_test_server};
 
 #[test]
 #[ignore]
 fn test_malformed_request_line() {
     let port = 9000;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Invalid request line
@@ -80,7 +25,7 @@ fn test_malformed_request_line() {
 #[ignore]
 fn test_invalid_http_method() {
     let port = 9001;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Invalid method
@@ -95,7 +40,7 @@ fn test_invalid_http_method() {
 #[ignore]
 fn test_missing_host_header() {
     let port = 9002;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Request without Host header
@@ -110,7 +55,7 @@ fn test_missing_host_header() {
 #[ignore]
 fn test_oversized_headers() {
     let port = 9003;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Request with very large header
@@ -126,7 +71,7 @@ fn test_oversized_headers() {
 #[ignore]
 fn test_invalid_content_length() {
     let port = 9004;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Request with Content-Length but no body
@@ -141,7 +86,7 @@ fn test_invalid_content_length() {
 #[ignore]
 fn test_chunked_encoding_error() {
     let port = 9005;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Invalid chunked encoding
@@ -156,7 +101,7 @@ fn test_chunked_encoding_error() {
 #[ignore]
 fn test_server_continues_after_error() {
     let port = 9006;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Send malformed request
@@ -177,14 +122,13 @@ fn test_server_continues_after_error() {
 #[ignore]
 fn test_body_size_exceeded() {
     let port = 9007;
-    let mut config = create_test_config(port);
-    config.client_max_body_size = 100; // Small limit
+    let config = create_test_config(port, 100); // Small limit
     
     let test_root = PathBuf::from(&config.servers[0].root);
     let upload_dir = test_root.join("uploads");
     fs::create_dir_all(&upload_dir).unwrap();
     
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Send body larger than limit
@@ -205,7 +149,7 @@ fn test_body_size_exceeded() {
 #[ignore]
 fn test_invalid_path() {
     let port = 9008;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Path with invalid characters or path traversal
@@ -215,5 +159,6 @@ fn test_invalid_path() {
     // Should return 404 or 403, not crash
     assert!(response.contains("404") || response.contains("403"));
 }
+
 
 

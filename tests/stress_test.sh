@@ -37,3 +37,9 @@ echo "Stress test completed"
 echo "Check availability percentage above - should be >= 99.5%"
 
 
+
+
+
+
+
+

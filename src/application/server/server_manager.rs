@@ -420,30 +420,25 @@ impl ServerManager {
             Ok(n) => n,
             Err(e) => {
                 // I/O error occurred - close connection
-                self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
-                self.close_connection(fd)?;
+                self.close_connection_on_error(fd)?;
                 return Err(e);
             }
         };
 
         if n == 0 {
             // Connection closed by client (EOF)
-            self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
-            self.close_connection(fd)?;
+            self.close_connection_on_error(fd)?;
             return Ok(());
         }
 
         // Add data to parser
         if let Err(e) = self.get_parser_mut(fd)?.add_data(&buf[..n]) {
             // Body size error - send 413 response
-            if let ServerError::HttpError(ref msg) = e {
-                if msg.contains("exceeds maximum allowed size") {
-                    return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
-                }
+            if Self::is_body_size_error(&e) {
+                return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
             }
             // Other error - close connection
-            self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
-            self.close_connection(fd)?;
+            self.close_connection_on_error(fd)?;
             return Err(e);
         }
 
@@ -453,8 +448,7 @@ impl ServerManager {
                 // Request parsed successfully - process it
                 if let Err(e) = self.process_request(fd, request) {
                     // Error processing request - close connection
-                    self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
-                    self.close_connection(fd)?;
+                    self.close_connection_on_error(fd)?;
                     return Err(e);
                 }
             }
@@ -463,16 +457,13 @@ impl ServerManager {
             }
             Err(e) => {
                 // Check if it's a body size error
-                if let ServerError::HttpError(ref msg) = e {
-                    if msg.contains("exceeds maximum allowed size") {
-                        // Send 413 Payload Too Large response
-                        // Use HTTP/1.1 as default version (we don't have request yet)
-                        return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
-                    }
+                if Self::is_body_size_error(&e) {
+                    // Send 413 Payload Too Large response
+                    // Use HTTP/1.1 as default version (we don't have request yet)
+                    return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
                 }
                 // Other parse error - close connection
-                self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
-                self.close_connection(fd)?;
+                self.close_connection_on_error(fd)?;
                 return Err(e);
             }
         }
@@ -694,8 +685,7 @@ impl ServerManager {
             Ok(n) => n,
             Err(e) => {
                 // I/O error occurred - close connection
-                self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
-                self.close_connection(fd)?;
+                self.close_connection_on_error(fd)?;
                 return Err(e);
             }
         };
@@ -726,8 +716,7 @@ impl ServerManager {
                 }
             } else {
                 // Close connection
-                self.get_connection_mut(fd)?.set_state(ConnectionState::Closed);
-                self.close_connection(fd)?;
+                self.close_connection_on_error(fd)?;
             }
         }
 
@@ -749,6 +738,23 @@ impl ServerManager {
         }
 
         Ok(())
+    }
+
+    /// Check if error is a body size violation
+    fn is_body_size_error(error: &ServerError) -> bool {
+        if let ServerError::HttpError(ref msg) = error {
+            msg.contains("exceeds maximum allowed size")
+        } else {
+            false
+        }
+    }
+
+    /// Close connection on error - helper to reduce code duplication
+    fn close_connection_on_error(&mut self, fd: i32) -> Result<()> {
+        if let Ok(connection) = self.get_connection_mut(fd) {
+            connection.set_state(ConnectionState::Closed);
+        }
+        self.close_connection(fd)
     }
 
     /// Close a connection and clean up resources

@@ -2,50 +2,18 @@
 // Note: Actual stress testing should be done with siege tool
 
 use std::fs;
-use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use localhost::application::config::models::{Config, ServerConfig, RouteConfig};
-use localhost::application::server::server_manager::ServerManager;
+mod common;
+use common::{create_test_config, send_request, start_test_server};
 
-fn create_test_config(port: u16) -> Config {
-    let test_root = std::env::temp_dir().join("localhost_stress_test");
-    fs::create_dir_all(&test_root).unwrap();
+/// Send request with timeout (for stress tests)
+fn send_request_with_timeout(port: u16, request: &str) -> Result<String, std::io::Error> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
     
-    // Create a simple test file
-    let test_file = test_root.join("test.html");
-    fs::write(&test_file, "<html><body>Test</body></html>").unwrap();
-    
-    Config {
-        client_timeout_secs: 30,
-        client_max_body_size: 1024 * 1024,
-        servers: vec![ServerConfig {
-            server_name: "localhost".to_string(),
-            server_address: std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-            ports: vec![port],
-            root: test_root.to_string_lossy().to_string(),
-            routes: vec![RouteConfig {
-                path: "/".to_string(),
-                methods: vec![],
-                redirect: None,
-                root: None,
-                default_file: Some("test.html".to_string()),
-                cgi_extension: None,
-                directory_listing: false,
-                upload_dir: None,
-            }],
-            error_pages: std::collections::HashMap::new(),
-            cgi_handlers: std::collections::HashMap::new(),
-            admin_access: false,
-        }],
-        admin: None,
-    }
-}
-
-fn send_request(port: u16, request: &str) -> Result<String, std::io::Error> {
     let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
@@ -58,15 +26,6 @@ fn send_request(port: u16, request: &str) -> Result<String, std::io::Error> {
     Ok(response)
 }
 
-fn start_test_server(port: u16) -> thread::JoinHandle<()> {
-    let config = create_test_config(port);
-    let mut server_manager = ServerManager::new(config).unwrap();
-    
-    thread::spawn(move || {
-        let _ = server_manager.run();
-    })
-}
-
 /// Helper function to send multiple concurrent requests
 pub fn send_concurrent_requests(port: u16, num_requests: usize) -> Vec<Result<String, std::io::Error>> {
     let request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
@@ -75,7 +34,7 @@ pub fn send_concurrent_requests(port: u16, num_requests: usize) -> Vec<Result<St
     for _ in 0..num_requests {
         let req = request.to_string();
         let handle = thread::spawn(move || {
-            send_request(port, &req)
+            send_request_with_timeout(port, &req)
         });
         handles.push(handle);
     }
@@ -87,7 +46,7 @@ pub fn send_concurrent_requests(port: u16, num_requests: usize) -> Vec<Result<St
 #[ignore] // Manual stress test
 fn test_concurrent_requests() {
     let port = 9100;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024 * 1024);
     thread::sleep(Duration::from_millis(500));
     
     let num_requests = 100;
@@ -110,7 +69,7 @@ fn test_concurrent_requests() {
 #[ignore] // Manual stress test
 fn test_rapid_requests() {
     let port = 9101;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024 * 1024);
     thread::sleep(Duration::from_millis(500));
     
     let num_requests = 1000;
@@ -120,7 +79,7 @@ fn test_rapid_requests() {
     let mut successful = 0;
     
     for _ in 0..num_requests {
-        if send_request(port, request).is_ok() {
+        if send_request_with_timeout(port, request).is_ok() {
             successful += 1;
         }
     }
@@ -138,7 +97,7 @@ fn test_rapid_requests() {
 #[ignore] // Manual stress test
 fn test_connection_cleanup() {
     let port = 9102;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024 * 1024);
     thread::sleep(Duration::from_millis(500));
     
     // Open many connections and close them
@@ -160,7 +119,7 @@ fn test_connection_cleanup() {
     
     // Server should still accept new connections
     let request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
-    let result = send_request(port, request);
+    let result = send_request_with_timeout(port, request);
     
     assert!(result.is_ok());
 }
@@ -172,7 +131,7 @@ pub fn measure_response_time(port: u16, num_samples: usize) -> Duration {
     
     for _ in 0..num_samples {
         let start = Instant::now();
-        let _ = send_request(port, request);
+        let _ = send_request_with_timeout(port, request);
         total_time += start.elapsed();
     }
     
@@ -183,7 +142,7 @@ pub fn measure_response_time(port: u16, num_samples: usize) -> Duration {
 #[ignore] // Manual performance test
 fn test_response_time() {
     let port = 9103;
-    let _server_thread = start_test_server(port);
+    let _server_thread = start_test_server(port, 1024 * 1024);
     thread::sleep(Duration::from_millis(500));
     
     let avg_time = measure_response_time(port, 100);
@@ -192,5 +151,6 @@ fn test_response_time() {
     // Response should be reasonably fast (< 100ms for simple request)
     assert!(avg_time < Duration::from_millis(100));
 }
+
 
 
