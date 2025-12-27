@@ -62,33 +62,104 @@ impl ServerManager {
 
         let mut server_instances = Vec::new();
         let mut default_servers = HashMap::new();
+        let mut errors = Vec::new();
 
         // First pass: create all server instances and determine defaults
+        // Collect errors but continue creating other servers
         for (idx, server_config) in config.servers.iter().enumerate() {
-            // First server for each port becomes default
+            // Determine if this should be default for its ports BEFORE creating
+            // (we need to check original config ports, not instance ports)
             let mut is_default = false;
             for port in &server_config.ports {
                 if !default_servers.contains_key(port) {
-                    default_servers.insert(*port, idx);
+                    // Will set to actual index after we know if creation succeeds
                     is_default = true;
                 }
             }
+            
+            match ServerInstance::new(server_config.clone(), is_default) {
+                Ok(instance) => {
+                    // Update default_servers with actual index in server_instances
+                    for port in instance.ports() {
+                        if !default_servers.contains_key(&port) {
+                            default_servers.insert(port, server_instances.len());
+                        }
+                    }
+                    server_instances.push(instance);
+                }
+                Err(e) => {
+                    let error_msg = format!(
+                        "Failed to create server instance {} (server_name: {:?}): {}",
+                        idx,
+                        server_config.server_name,
+                        e
+                    );
+                    errors.push(error_msg.clone());
+                    crate::common::logger::Logger::error(&error_msg);
+                    // Continue with next server
+                }
+            }
+        }
 
-            let instance = ServerInstance::new(server_config.clone(), is_default)?;
-            server_instances.push(instance);
+        // Check if we have at least one server instance
+        if server_instances.is_empty() {
+            let error_msg = format!(
+                "Failed to create any server instances. Errors: {}",
+                errors.join("; ")
+            );
+            return Err(ServerError::ConfigError(error_msg));
+        }
+
+        // Log errors but continue if we have at least one working server
+        if !errors.is_empty() {
+            crate::common::logger::Logger::error(&format!(
+                "Some server instances failed to start. Errors: {}",
+                errors.join("; ")
+            ));
         }
 
         // Second pass: register listeners with event loop
+        // Collect registration errors but continue
         let mut listener_to_server = HashMap::new();
+        let mut registration_errors = Vec::new();
+        
         for (idx, instance) in server_instances.iter().enumerate() {
             for port in instance.ports() {
                 let addr = SocketAddr::new(instance.config().server_address, port);
                 if let Some(listener) = instance.listener(port) {
                     let fd = listener.as_raw_fd();
-                    listener_to_server.insert(fd, (idx, addr, port));
-                    event_manager.register_read(fd, fd as usize)?;
+                    match event_manager.register_read(fd, fd as usize) {
+                        Ok(_) => {
+                            listener_to_server.insert(fd, (idx, addr, port));
+                        }
+                        Err(e) => {
+                            let error_msg = format!(
+                                "Failed to register listener for server {} on port {}: {}",
+                                idx, port, e
+                            );
+                            registration_errors.push(error_msg.clone());
+                            crate::common::logger::Logger::error(&error_msg);
+                            // Continue with next listener
+                        }
+                    }
                 }
             }
+        }
+
+        // Log registration errors but continue if we have at least one listener
+        if !registration_errors.is_empty() && listener_to_server.is_empty() {
+            let error_msg = format!(
+                "Failed to register any listeners. Errors: {}",
+                registration_errors.join("; ")
+            );
+            return Err(ServerError::NetworkError(error_msg));
+        }
+
+        if !registration_errors.is_empty() {
+            crate::common::logger::Logger::error(&format!(
+                "Some listeners failed to register. Errors: {}",
+                registration_errors.join("; ")
+            ));
         }
 
         // Build servers map from instances
