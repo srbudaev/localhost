@@ -7,6 +7,7 @@ pub mod error_page_handler;
 pub mod upload_handler;
 pub mod cgi_handler;
 pub mod session_manager;
+pub mod delete_handler;
 
 pub use router::Router;
 pub use request_handler::RequestHandler;
@@ -16,4 +17,5 @@ pub use redirection_handler::RedirectionHandler;
 pub use error_page_handler::ErrorPageHandler;
 pub use upload_handler::UploadHandler;
 pub use cgi_handler::CgiHandler;
+pub use delete_handler::DeleteHandler;
 pub use session_manager::{SessionManager, Session, SessionData};
