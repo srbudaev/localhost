@@ -658,27 +658,36 @@ impl ServerManager {
 
     /// Handle write event - send response to client
     fn handle_write(&mut self, fd: i32) -> Result<()> {
-        let connection = self.get_connection_mut(fd)?;
-
         // Get data to write first
         let data: Vec<u8> = {
+            let connection = self.get_connection_mut(fd)?;
             let write_buffer = connection.write_buffer_mut();
             if write_buffer.is_empty() {
                 // Nothing to write
                 connection.set_state(ConnectionState::Reading);
-                if let Err(e) = self.event_manager.unregister_write(fd) {
-                    // Error unregistering - close connection
-                    connection.set_state(ConnectionState::Closed);
-                    self.close_connection(fd)?;
-                    return Err(e);
-                }
-                return Ok(());
+                // Connection reference dropped at end of this block
+                Vec::new()
+            } else {
+                // Copy the data so we can drop the connection reference
+                write_buffer.as_slice().to_vec()
             }
-            write_buffer.as_slice()
         };
+        
+        // Handle empty write buffer case after dropping connection reference
+        if data.is_empty() {
+            if let Err(e) = self.event_manager.unregister_write(fd) {
+                // Error unregistering - close connection
+                let connection = self.get_connection_mut(fd)?;
+                connection.set_state(ConnectionState::Closed);
+                self.close_connection(fd)?;
+                return Err(e);
+            }
+            return Ok(());
+        }
 
         // Write data
         let n = match {
+            let connection = self.get_connection_mut(fd)?;
             let socket = connection.socket_mut();
             write_non_blocking(socket, &data)
         } {
@@ -702,14 +711,19 @@ impl ServerManager {
             let should_keep_alive = self.get_connection(fd)?.should_keep_alive();
             if should_keep_alive {
                 // Reset for next request
-                let connection = self.get_connection_mut(fd)?;
-                connection.set_state(ConnectionState::Reading);
-                connection.read_buffer_mut().clear();
+                {
+                    let connection = self.get_connection_mut(fd)?;
+                    connection.set_state(ConnectionState::Reading);
+                    connection.read_buffer_mut().clear();
+                }
+                // Reset parser after dropping connection reference
                 if let Some(parser) = self.parsers.get_mut(&fd) {
                     parser.reset();
                 }
+                // Unregister write after dropping connection reference
                 if let Err(e) = self.event_manager.unregister_write(fd) {
                     // Error unregistering - close connection
+                    let connection = self.get_connection_mut(fd)?;
                     connection.set_state(ConnectionState::Closed);
                     self.close_connection(fd)?;
                     return Err(e);
