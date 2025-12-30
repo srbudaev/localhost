@@ -4,8 +4,10 @@
 import os
 import sys
 
-print("Content-Type: text/html\n")
-print("""
+# Output CGI headers with proper CRLF line endings
+sys.stdout.write("Content-Type: text/html\r\n")
+sys.stdout.write("\r\n")
+sys.stdout.write("""
 <!DOCTYPE html>
 <html lang="en">
 <head>
