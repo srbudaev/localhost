@@ -76,3 +76,68 @@ redirect = "/new"
 "413" = { filename = "errors/413.html" }
 "500" = { filename = "errors/500.html" }
 
+
+# Server instances configuration
+[[servers]]
+# Bind to localhost
+server_address = "127.0.0.1"
+
+# Listen on port 8080
+ports = [8080]
+
+# Server name for Host header matching
+server_name = "anotherhost"
+
+# Document root directory
+root = "./root"
+
+# Enable admin access
+admin_access = false
+
+# CGI script handlers (file extension -> interpreter)
+# Extensions must start with a dot (.)
+[servers.cgi_handlers]
+".py" = "python3"      # Python scripts
+".sh" = "/bin/sh"      # Shell scripts
+".pl" = "perl"         # Perl scripts
+".rb" = "ruby"         # Ruby scripts
+
+# Route definitions
+# Root route - serves files from root directory
+[servers.routes."/"]
+methods = ["GET", "POST"]
+directory = "."
+default_file = "index.html"
+directory_listing = true
+
+# Static files directory
+[servers.routes."/static"]
+methods = ["GET"]
+directory = "./static"
+directory_listing = false
+
+# CGI scripts directory
+[servers.routes."/cgi-bin"]
+methods = ["GET", "POST"]
+directory = "./cgi-bin"
+cgi_extension = ".py"
+
+# File upload endpoint
+[servers.routes."/upload"]
+methods = ["POST"]
+upload_dir = "./uploads"
+
+# Redirect example
+[servers.routes."/old"]
+methods = ["GET"]
+redirect = "/new"
+
+# Custom error pages
+[servers.errors]
+"400" = { filename = "errors/400.html" }
+"403" = { filename = "errors/403.html" }
+"404" = { filename = "errors/404.html" }
+"405" = { filename = "errors/405.html" }
+"413" = { filename = "errors/413.html" }
+"500" = { filename = "errors/500.html" }
+
