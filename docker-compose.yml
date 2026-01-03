@@ -1,0 +1,28 @@
+services:
+  localhost-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: localhost-server
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount config file for easy modification (optional - uncomment if you have config.toml)
+      # - ./config.toml:/app/config.toml:ro
+      # Or use config.docker.toml by copying it first: cp config.docker.toml config.toml
+      - ./config.docker.toml:/app/config.toml:ro
+      # Mount directories for development
+      - ./root:/app/root:ro
+      - ./static:/app/static:ro
+      - ./cgi-bin:/app/cgi-bin:ro
+      - ./errors:/app/errors:ro
+      # Mount uploads directory as writable
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - localhost-network
+
+networks:
+  localhost-network:
+    driver: bridge
+

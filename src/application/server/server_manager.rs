@@ -247,7 +247,10 @@ impl ServerManager {
 
             // First pass: collect event data
             for event in events {
+                #[cfg(target_os = "macos")]
                 let fd = event.ident as i32;
+                #[cfg(target_os = "linux")]
+                let fd = event.fd as i32;
                 if let Some(&(server_idx, addr, port)) = self.listener_to_server.get(&fd) {
                     listener_events.push((fd, server_idx, addr, port));
                 } else {

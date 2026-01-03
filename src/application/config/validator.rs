@@ -76,12 +76,8 @@ fn validate_port_conflicts(config: &Config) -> Result<()> {
 
 fn validate_server(server: &ServerConfig, index: usize) -> Result<()> {
     // Validate server address
-    if server.server_address.is_unspecified() {
-        return Err(ServerError::ConfigError(format!(
-            "Server {}: server_address cannot be 0.0.0.0 or ::",
-            index
-        )));
-    }
+    // Note: 0.0.0.0 is allowed for Docker/container deployments
+    // The original check was removed to support binding to all interfaces
 
     // Validate ports
     if server.ports.is_empty() {
