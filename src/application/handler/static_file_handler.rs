@@ -55,7 +55,7 @@ impl RequestHandler for StaticFileHandler {
 
         // Check if file exists
         if !file_path.exists() {
-            return Ok(Response::not_found_with_message(request.version, "Not Found"));
+            return Err(ServerError::HttpError("File not found".to_string()));
         }
 
         // Check if it's a directory

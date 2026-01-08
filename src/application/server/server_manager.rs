@@ -45,7 +45,7 @@ pub struct ServerManager {
 
     /// Listener FD to (server_index, address, port) mapping
     listener_to_server: HashMap<i32, (usize, SocketAddr, u16)>,
-
+ 
     /// Session manager for handling HTTP sessions
     session_manager: SessionManager,
 
@@ -528,11 +528,31 @@ impl ServerManager {
                 } else if file_path.is_dir() && router.is_directory_listing_enabled(route) {
                     // Directory listing
                     let handler = DirectoryListingHandler::new(router);
-                    handler.handle(&request)?
+                    match handler.handle(&request) {
+                        Ok(response) => response,
+                        Err(_) => {
+                            // Directory not found or other error - use custom error page
+                            self.generate_error_response(
+                                server_instance,
+                                crate::http::status::StatusCode::NOT_FOUND,
+                                request.version,
+                            )?
+                        }
+                    }
                 } else {
                     // Static file
                     let handler = StaticFileHandler::new(router);
-                    handler.handle(&request)?
+                    match handler.handle(&request) {
+                        Ok(response) => response,
+                        Err(_) => {
+                            // File not found or other error - use custom error page
+                            self.generate_error_response(
+                                server_instance,
+                                crate::http::status::StatusCode::NOT_FOUND,
+                                request.version,
+                            )?
+                        }
+                    }
                 }
             }
         } else {

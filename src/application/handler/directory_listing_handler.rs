@@ -121,7 +121,7 @@ impl RequestHandler for DirectoryListingHandler {
 
         // Verify it's a directory
         if !dir_path.is_dir() {
-            return Ok(Response::not_found_with_message(request.version, "Not Found"));
+            return Err(ServerError::HttpError("Directory not found".to_string()));
         }
 
         // Check if directory listing is enabled
