@@ -3,6 +3,7 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::thread;
 use std::time::Duration;
 
 use localhost::application::config::models::RouteConfig;
@@ -61,7 +62,9 @@ fn test_post_request() {
     let mut config = create_test_config(port, 1024 * 1024);
     
     // Add upload route
-    config.servers[0].routes[0].upload_dir = Some("uploads".to_string());
+    if let Some(route) = config.servers[0].routes.get_mut("/") {
+        route.upload_dir = Some("uploads".to_string());
+    }
     
     let test_root = PathBuf::from(&config.servers[0].root);
     let upload_dir = test_root.join("uploads");
@@ -109,7 +112,7 @@ fn test_delete_request() {
 #[ignore]
 fn test_not_found() {
     let port = 8084;
-    let config = create_test_config(port, 1024 * 1024);
+    let _config = create_test_config(port, 1024 * 1024);
     
     let _server_thread = start_test_server(port, 1024 * 1024);
     thread::sleep(Duration::from_millis(500));
@@ -124,7 +127,7 @@ fn test_not_found() {
 #[ignore]
 fn test_body_size_limit() {
     let port = 8085;
-    let config = create_test_config(port, 100); // Small limit
+    let _config = create_test_config(port, 100); // Small limit
     
     let _server_thread = start_test_server(port, 100);
     thread::sleep(Duration::from_millis(500));
@@ -148,7 +151,9 @@ fn test_method_not_allowed() {
     let port = 8086;
     let mut config = create_test_config(port, 1024 * 1024);
     // Restrict route to GET only
-    config.servers[0].routes[0].methods = vec!["GET".to_string()];
+    if let Some(route) = config.servers[0].routes.get_mut("/") {
+        route.methods = vec!["GET".to_string()];
+    }
     
     let _server_thread = start_test_server(port, 1024 * 1024);
     thread::sleep(Duration::from_millis(500));
@@ -165,7 +170,9 @@ fn test_method_not_allowed() {
 fn test_directory_listing() {
     let port = 8087;
     let mut config = create_test_config(port, 1024 * 1024);
-    config.servers[0].routes[0].directory_listing = true;
+    if let Some(route) = config.servers[0].routes.get_mut("/") {
+        route.directory_listing = true;
+    }
     
     let test_root = PathBuf::from(&config.servers[0].root);
     let subdir = test_root.join("subdir");
@@ -187,7 +194,9 @@ fn test_directory_listing() {
 fn test_default_file() {
     let port = 8088;
     let mut config = create_test_config(port, 1024 * 1024);
-    config.servers[0].routes[0].default_file = Some("index.html".to_string());
+    if let Some(route) = config.servers[0].routes.get_mut("/") {
+        route.default_file = Some("index.html".to_string());
+    }
     
     let test_root = PathBuf::from(&config.servers[0].root);
     let index_file = test_root.join("index.html");
@@ -209,11 +218,11 @@ fn test_default_file() {
 fn test_redirect() {
     let port = 8089;
     let mut config = create_test_config(port, 1024 * 1024);
-    config.servers[0].routes.push(RouteConfig {
-        path: "/old".to_string(),
+    config.servers[0].routes.insert("/old".to_string(), RouteConfig {
         methods: vec![],
+        filename: None,
+        directory: None,
         redirect: Some("/new".to_string()),
-        root: None,
         default_file: None,
         cgi_extension: None,
         directory_listing: false,

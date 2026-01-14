@@ -1,5 +1,7 @@
 // Error handling tests - verify server handles errors gracefully
 
+use std::fs;
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
