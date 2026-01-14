@@ -26,9 +26,11 @@ pub struct ServerManager {
     server_instances: Vec<ServerInstance>,
 
     /// Server index by (address, port)
+    #[allow(dead_code)] // Reserved for future use in server lookup
     servers: HashMap<(SocketAddr, u16), usize>,
 
     /// Default server index for each port (first server for that port)
+    #[allow(dead_code)] // Reserved for future use in default server lookup
     default_servers: HashMap<u16, usize>,
 
     /// Event loop for I/O operations
