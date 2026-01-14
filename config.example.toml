@@ -26,13 +26,14 @@ directory_listing = true
 [servers.routes."/static"]
 methods = ["GET"]
 directory = "./static"
+default_file = "index.html"
 directory_listing = false
 
 # CGI scripts directory
 [servers.routes."/cgi-bin"]
 methods = ["GET", "POST"]
-directory = "./cgi-bin"
-cgi_extension = ".py"
+directory = "cgi-bin"
+cgi_extension = "py"
 
 # File upload endpoint
 [servers.routes."/upload"]
@@ -97,7 +98,7 @@ directory_listing = false
 [servers.routes."/cgi-bin"]
 methods = ["GET", "POST"]
 directory = "./cgi-bin"
-cgi_extension = ".py"
+cgi_extension = "py"
 
 # File upload endpoint
 [servers.routes."/upload"]
