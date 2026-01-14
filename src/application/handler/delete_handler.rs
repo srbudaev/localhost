@@ -1,10 +1,9 @@
 use crate::application::handler::request_handler::RequestHandler;
 use crate::application::handler::router::Router;
-use crate::common::error::{Result, ServerError};
+use crate::common::error::Result;
 use crate::http::method::Method;
 use crate::http::request::Request;
 use crate::http::response::Response;
-use crate::http::status::StatusCode;
 use std::fs;
 use std::path::Path;
 

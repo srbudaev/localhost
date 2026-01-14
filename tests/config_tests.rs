@@ -2,7 +2,6 @@
 
 use localhost::application::config::loader::ConfigLoader;
 use std::fs;
-use std::path::PathBuf;
 
 #[test]
 fn test_valid_config_parsing() {
@@ -34,7 +33,7 @@ invalid = "config"
     let temp_file = std::env::temp_dir().join("test_invalid_config.toml");
     fs::write(&temp_file, toml_content).unwrap();
     
-    let result = ConfigLoader::load(temp_file.to_str().unwrap());
+    let _result = ConfigLoader::load(temp_file.to_str().unwrap());
     // Should fail or handle gracefully
     // Note: Actual behavior depends on validator implementation
 }
@@ -129,8 +128,8 @@ routes = []
     assert!(result.is_ok());
     
     let config = result.unwrap();
-    assert!(config.servers[0].error_pages.contains_key("404"));
-    assert!(config.servers[0].error_pages.contains_key("500"));
+    assert!(config.servers[0].errors.contains_key("404"));
+    assert!(config.servers[0].errors.contains_key("500"));
 }
 
 #[test]

@@ -325,7 +325,7 @@ mod tests {
     fn test_parse_simple_request() {
         let request_str = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
         let mut parser = RequestParser::new();
-        parser.add_data(request_str.as_bytes());
+        parser.add_data(request_str.as_bytes()).unwrap();
         let request = parser.parse().unwrap().unwrap();
         assert_eq!(request.method, Method::GET);
         assert_eq!(request.path(), "/");

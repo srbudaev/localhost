@@ -1,13 +1,13 @@
 // Stress test helpers and utilities
 // Note: Actual stress testing should be done with siege tool
 
-use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::net::TcpStream;
 use std::thread;
 use std::time::{Duration, Instant};
 
 mod common;
-use common::{create_test_config, send_request, start_test_server};
+use common::start_test_server;
 
 /// Send request with timeout (for stress tests)
 fn send_request_with_timeout(port: u16, request: &str) -> Result<String, std::io::Error> {
