@@ -64,9 +64,14 @@ impl Response {
         Self::new(version, StatusCode::INTERNAL_SERVER_ERROR)
     }
 
-    /// Create a 302 Found (redirect) response
+    /// Create a 302 Found (temporary redirect) response
     pub fn found(version: Version) -> Self {
         Self::new(version, StatusCode::FOUND)
+    }
+
+    /// Create a 301 Moved Permanently (permanent redirect) response
+    pub fn moved_permanently(version: Version) -> Self {
+        Self::new(version, StatusCode::MOVED_PERMANENTLY)
     }
 
     /// Create a 400 Bad Request response

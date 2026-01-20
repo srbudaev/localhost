@@ -93,6 +93,10 @@ pub struct RouteConfig {
     #[serde(default)]
     pub redirect: Option<String>,
 
+    /// Redirect type: "301" for permanent redirect, "302" for temporary redirect (default: "302")
+    #[serde(default)]
+    pub redirect_type: Option<String>,
+
     /// CGI extension for this route
     #[serde(default)]
     pub cgi_extension: Option<String>,
@@ -101,8 +105,13 @@ pub struct RouteConfig {
 /// Error page configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ErrorPageConfig {
-    /// Filename of the error page
-    pub filename: String,
+    /// Filename of the error page (optional - if redirect is set, this is ignored)
+    #[serde(default)]
+    pub filename: Option<String>,
+    
+    /// Redirect URL for this error (optional - if set, redirects instead of showing error page)
+    #[serde(default)]
+    pub redirect: Option<String>,
 }
 
 /// Admin configuration
@@ -136,6 +145,7 @@ impl Default for RouteConfig {
             directory_listing: false,
             upload_dir: None,
             redirect: None,
+            redirect_type: None,
             cgi_extension: None,
         }
     }

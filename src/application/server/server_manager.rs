@@ -25,13 +25,6 @@ pub struct ServerManager {
     /// Server instances
     server_instances: Vec<ServerInstance>,
 
-    /// Server index by (address, port)
-    #[allow(dead_code)] // Reserved for future use in server lookup
-    servers: HashMap<(SocketAddr, u16), usize>,
-
-    /// Default server index for each port (first server for that port)
-    #[allow(dead_code)] // Reserved for future use in default server lookup
-    default_servers: HashMap<u16, usize>,
 
     /// Event loop for I/O operations
     event_loop: EventLoop,
@@ -45,8 +38,18 @@ pub struct ServerManager {
     /// Request parsers for each connection
     parsers: HashMap<i32, RequestParser>,
 
-    /// Listener FD to (server_index, address, port) mapping
-    listener_to_server: HashMap<i32, (usize, SocketAddr, u16)>,
+    /// Listener FD to port mapping (one listener per port, shared by all servers)
+    listener_to_port: HashMap<i32, u16>,
+
+    /// Port to listener mapping (one listener per port, shared by all servers)
+    port_to_listener: HashMap<u16, crate::application::server::listener::Listener>,
+
+    /// Default server index for each port (first server configured for that port)
+    default_servers: HashMap<u16, usize>,
+
+    /// Server lookup: (port, hostname) -> server index
+    /// Used for virtual host routing
+    server_lookup: HashMap<(u16, String), usize>,
  
     /// Session manager for handling HTTP sessions
     session_manager: SessionManager,
@@ -64,28 +67,30 @@ impl ServerManager {
 
         let mut server_instances = Vec::new();
         let mut default_servers = HashMap::new();
+        let mut server_lookup = HashMap::new();
         let mut errors = Vec::new();
 
-        // First pass: create all server instances and determine defaults
+        // First pass: create all server instances WITHOUT listeners
         // Collect errors but continue creating other servers
         for (idx, server_config) in config.servers.iter().enumerate() {
             // Determine if this should be default for its ports BEFORE creating
-            // (we need to check original config ports, not instance ports)
             let mut is_default = false;
             for port in &server_config.ports {
                 if !default_servers.contains_key(port) {
-                    // Will set to actual index after we know if creation succeeds
                     is_default = true;
                 }
             }
             
-            match ServerInstance::new(server_config.clone(), is_default) {
+            match ServerInstance::new_without_listeners(server_config.clone(), is_default) {
                 Ok(instance) => {
                     // Update default_servers with actual index in server_instances
                     for port in instance.ports() {
                         if !default_servers.contains_key(&port) {
                             default_servers.insert(port, server_instances.len());
                         }
+                        // Build server lookup: (port, hostname) -> server index
+                        let hostname = instance.server_name().to_lowercase();
+                        server_lookup.insert((port, hostname), server_instances.len());
                     }
                     server_instances.push(instance);
                 }
@@ -120,36 +125,60 @@ impl ServerManager {
             ));
         }
 
-        // Second pass: register listeners with event loop
-        // Collect registration errors but continue
-        let mut listener_to_server = HashMap::new();
+        // Second pass: create ONE listener per port (shared by all servers on that port)
+        // Group servers by port and create listeners
+        let mut port_to_listener: HashMap<u16, crate::application::server::listener::Listener> = HashMap::new();
+        let mut listener_to_port = HashMap::new();
         let mut registration_errors = Vec::new();
         
-        for (idx, instance) in server_instances.iter().enumerate() {
+        // Collect all unique ports from all servers
+        let mut all_ports = std::collections::HashSet::new();
+        for instance in &server_instances {
             for port in instance.ports() {
-                let addr = SocketAddr::new(instance.config().server_address, port);
-                if let Some(listener) = instance.listener(port) {
+                all_ports.insert(port);
+            }
+        }
+
+        // Create one listener per port
+        for port in all_ports {
+            // Use the first server's address for this port (all servers on same port should use same address)
+            let first_server_idx = default_servers.get(&port)
+                .copied()
+                .ok_or_else(|| ServerError::ConfigError(format!("No server found for port {}", port)))?;
+            let first_server = &server_instances[first_server_idx];
+            let addr = SocketAddr::new(first_server.config().server_address, port);
+            
+            match crate::application::server::listener::Listener::new(addr) {
+                Ok(listener) => {
                     let fd = listener.as_raw_fd();
                     match event_manager.register_read(fd, fd as usize) {
                         Ok(_) => {
-                            listener_to_server.insert(fd, (idx, addr, port));
+                            port_to_listener.insert(port, listener);
+                            listener_to_port.insert(fd, port);
                         }
                         Err(e) => {
                             let error_msg = format!(
-                                "Failed to register listener for server {} on port {}: {}",
-                                idx, port, e
+                                "Failed to register listener for port {}: {}",
+                                port, e
                             );
                             registration_errors.push(error_msg.clone());
                             crate::common::logger::Logger::error(&error_msg);
-                            // Continue with next listener
                         }
                     }
+                }
+                Err(e) => {
+                    let error_msg = format!(
+                        "Failed to create listener for port {}: {}",
+                        port, e
+                    );
+                    registration_errors.push(error_msg.clone());
+                    crate::common::logger::Logger::error(&error_msg);
                 }
             }
         }
 
         // Log registration errors but continue if we have at least one listener
-        if !registration_errors.is_empty() && listener_to_server.is_empty() {
+        if !registration_errors.is_empty() && listener_to_port.is_empty() {
             let error_msg = format!(
                 "Failed to register any listeners. Errors: {}",
                 registration_errors.join("; ")
@@ -164,23 +193,15 @@ impl ServerManager {
             ));
         }
 
-        // Build servers map from instances
-        let mut servers = HashMap::new();
-        for (idx, instance) in server_instances.iter().enumerate() {
-            for port in instance.ports() {
-                let addr = SocketAddr::new(instance.config().server_address, port);
-                servers.insert((addr, port), idx);
-            }
-        }
-
         Ok(Self {
-            servers,
-            default_servers,
             event_loop,
             event_manager,
             connections: HashMap::new(),
             parsers: HashMap::new(),
-            listener_to_server,
+            listener_to_port,
+            port_to_listener,
+            default_servers,
+            server_lookup,
             server_instances,
             session_manager: SessionManager::new(DEFAULT_SESSION_TIMEOUT_SECS),
             max_body_size: config.client_max_body_size,
@@ -250,8 +271,8 @@ impl ServerManager {
             // First pass: collect event data
             for event in events {
                 let fd = event.ident as i32;
-                if let Some(&(server_idx, addr, port)) = self.listener_to_server.get(&fd) {
-                    listener_events.push((fd, server_idx, addr, port));
+                if let Some(&port) = self.listener_to_port.get(&fd) {
+                    listener_events.push((fd, port));
                 } else {
                     // Copy event data (kevent is Copy)
                     client_events.push((fd, *event));
@@ -259,8 +280,8 @@ impl ServerManager {
             }
 
             // Second pass: process listener events
-            for (fd, _server_idx, addr, port) in listener_events {
-                if let Err(e) = self.handle_listener_event(fd, addr, port) {
+            for (fd, port) in listener_events {
+                if let Err(e) = self.handle_listener_event(fd, port) {
                     // Log error but continue processing other events
                     crate::common::logger::Logger::error(&format!(
                         "Error handling listener event for fd {}: {}",
@@ -297,51 +318,45 @@ impl ServerManager {
     fn handle_listener_event(
         &mut self,
         fd: i32,
-        _addr: SocketAddr,
-        _port: u16,
+        port: u16,
     ) -> Result<()> {
-        // Get server index from listener mapping
-        if let Some(&(server_idx, _addr, port)) = self.listener_to_server.get(&fd) {
-            // Get listener from server instance
-            let listener = self.server_instances
-                .get(server_idx)
-                .and_then(|instance| instance.listener(port));
+        // Get the listener for this port
+        let listener = self.port_to_listener.get_mut(&port)
+            .ok_or_else(|| ServerError::NetworkError(format!("No listener found for port {}", port)))?;
+        
+        match listener.accept() {
+            Ok(Some(client_socket)) => {
+                let client_fd = client_socket.as_raw_fd();
+                // Create connection with port tracking
+                let connection = Connection::with_port(client_socket, 30, port); // 30 second timeout
+                let parser = RequestParser::with_max_body_size(self.max_body_size);
 
-            if let Some(listener) = listener {
-                match listener.accept() {
-                    Ok(Some(client_socket)) => {
-                        let client_fd = client_socket.as_raw_fd();
-                        let connection = Connection::new(client_socket, 30); // 30 second timeout
-                        let parser = RequestParser::with_max_body_size(self.max_body_size);
+                self.connections.insert(client_fd, connection);
+                self.parsers.insert(client_fd, parser);
 
-                        self.connections.insert(client_fd, connection);
-                        self.parsers.insert(client_fd, parser);
-
-                        // Register client socket for read events
-                        if let Err(e) = self.event_manager.register_read(client_fd, client_fd as usize) {
-                            // Failed to register - clean up connection
-                            self.connections.remove(&client_fd);
-                            self.parsers.remove(&client_fd);
-                            crate::common::logger::Logger::error(&format!(
-                                "Failed to register read event for new connection fd {}: {}",
-                                client_fd, e
-                            ));
-                            return Err(e);
-                        }
-                    }
-                    Ok(None) => {
-                        // No connection available (non-blocking accept)
-                        // This is normal, just return
-                    }
-                    Err(e) => {
-                        // Error accepting connection - log but don't crash
-                        crate::common::logger::Logger::error(&format!(
-                            "Error accepting connection on listener fd {}: {}",
-                            fd, e
-                        ));
-                        return Err(e);
-                    }
+                // Register client socket for read events
+                if let Err(e) = self.event_manager.register_read(client_fd, client_fd as usize) {
+                    // Failed to register - clean up connection
+                    self.connections.remove(&client_fd);
+                    self.parsers.remove(&client_fd);
+                    crate::common::logger::Logger::error(&format!(
+                        "Failed to register read event for new connection fd {}: {}",
+                        client_fd, e
+                    ));
+                    return Err(e);
                 }
+            }
+            Ok(None) => {
+                // No connection available (non-blocking accept)
+                // This is normal, just return
+            }
+            Err(e) => {
+                // Error accepting connection - log but don't crash
+                crate::common::logger::Logger::error(&format!(
+                    "Error accepting connection on listener fd {}: {}",
+                    fd, e
+                ));
+                return Err(e);
             }
         }
         Ok(())
@@ -368,6 +383,50 @@ impl ServerManager {
     fn get_parser_mut(&mut self, fd: i32) -> Result<&mut RequestParser> {
         self.parsers.get_mut(&fd)
             .ok_or_else(|| Self::not_found_error("Parser", fd))
+    }
+
+    /// Get server port from connection (helper to reduce redundancy)
+    fn get_connection_port(&self, fd: i32) -> Result<u16> {
+        self.get_connection(fd)?
+            .server_port()
+            .ok_or_else(|| ServerError::HttpError("Connection missing server port".to_string()))
+    }
+
+    /// Get default server index for a port (helper to reduce redundancy)
+    fn get_default_server_for_port(&self, port: u16) -> Result<usize> {
+        self.default_servers.get(&port)
+            .copied()
+            .ok_or_else(|| ServerError::HttpError(format!("No server found for port {}", port)))
+    }
+
+    /// Get server instance by index (helper to reduce redundancy)
+    fn get_server_instance(&self, idx: usize) -> Result<&ServerInstance> {
+        self.server_instances.get(idx)
+            .ok_or_else(|| ServerError::HttpError(format!("Server instance {} not found", idx)))
+    }
+
+    /// Write response to connection and register for write events (helper to reduce redundancy)
+    fn write_response_to_connection(
+        &mut self,
+        fd: i32,
+        response: &Response,
+        keep_alive: bool,
+    ) -> Result<()> {
+        // Serialize response
+        let response_bytes = ResponseSerializer::serialize_auto(response)?;
+
+        // Write response to connection buffer
+        {
+            let connection = self.get_connection_mut(fd)?;
+            connection.set_keep_alive(keep_alive);
+            connection.write_buffer_mut().extend(&response_bytes);
+            connection.set_state(ConnectionState::Writing);
+        }
+
+        // Register for write events
+        self.event_manager.register_write(fd, fd as usize)?;
+
+        Ok(())
     }
 
     /// Handle event on a client connection
@@ -437,7 +496,8 @@ impl ServerManager {
         if let Err(e) = self.get_parser_mut(fd)?.add_data(&buf[..n]) {
             // Body size error - send 413 response
             if Self::is_body_size_error(&e) {
-                return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
+                let version = self.get_request_version_or_default(fd);
+                return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, version);
             }
             // Other error - close connection
             self.close_connection_on_error(fd)?;
@@ -461,8 +521,9 @@ impl ServerManager {
                 // Check if it's a body size error
                 if Self::is_body_size_error(&e) {
                     // Send 413 Payload Too Large response
-                    // Use HTTP/1.1 as default version (we don't have request yet)
-                    return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
+                    // Try to get HTTP version from parser if available
+                    let version = self.get_request_version_or_default(fd);
+                    return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, version);
                 }
                 // Other parse error - close connection
                 self.close_connection_on_error(fd)?;
@@ -475,9 +536,12 @@ impl ServerManager {
 
     /// Process a parsed HTTP request
     fn process_request(&mut self, fd: i32, request: Request) -> Result<()> {
-        // Find server instance based on Host header
-        let server_idx = self.find_server_for_request(&request)?;
-        let server_instance = &self.server_instances[server_idx];
+        // Get connection to find the port it came in on
+        let port = self.get_connection_port(fd)?;
+        
+        // Find server instance based on Host header and port
+        let server_idx = self.find_server_for_request(&request, port)?;
+        let server_instance = self.get_server_instance(server_idx)?;
 
         // Create router
         let router = Router::new(server_instance.config(), server_instance.root_path().clone());
@@ -518,43 +582,63 @@ impl ServerManager {
                         })
                         .unwrap_or(false));
 
-                if is_cgi && file_path.exists() && file_path.is_file() {
+                if is_cgi && crate::common::path_utils::is_valid_file(&file_path) {
                     // Execute CGI script
                     use crate::application::handler::cgi_handler::CgiHandler;
                     let cgi_handler = CgiHandler::new(
                         router,
                         server_instance.config().clone(),
-                        server_instance.ports()[0], // Use first port
+                        port, // Use the port from the connection
                     );
                     cgi_handler.handle(&request)?
-                } else if file_path.is_dir() && router.is_directory_listing_enabled(route) {
-                    // Directory listing
-                    let handler = DirectoryListingHandler::new(router);
-                    match handler.handle(&request) {
-                        Ok(response) => response,
-                        Err(_) => {
-                            // Directory not found or other error - use custom error page
-                            self.generate_error_response(
+                } else if file_path.is_dir() {
+                    // Check for default_file first before directory listing
+                    if let Some(default_file) = router.get_default_file(route) {
+                        let default_path = file_path.join(default_file);
+                        if crate::common::path_utils::is_valid_file(&default_path) {
+                            // Serve default file via StaticFileHandler
+                            let handler = StaticFileHandler::new(router);
+                            self.handle_with_error_fallback(
+                                handler,
+                                &request,
                                 server_instance,
                                 crate::http::status::StatusCode::NOT_FOUND,
-                                request.version,
                             )?
+                        } else if router.is_directory_listing_enabled(route) {
+                            // Default file doesn't exist, fall back to directory listing if enabled
+                            let handler = DirectoryListingHandler::new(router);
+                            self.handle_with_error_fallback(
+                                handler,
+                                &request,
+                                server_instance,
+                                crate::http::status::StatusCode::NOT_FOUND,
+                            )?
+                        } else {
+                            // No default file and directory listing disabled - return 403
+                            Response::forbidden_with_message(request.version, "Forbidden")
                         }
+                    } else if router.is_directory_listing_enabled(route) {
+                        // No default_file configured, check directory listing
+                        let handler = DirectoryListingHandler::new(router);
+                        self.handle_with_error_fallback(
+                            handler,
+                            &request,
+                            server_instance,
+                            crate::http::status::StatusCode::NOT_FOUND,
+                        )?
+                    } else {
+                        // No default_file and directory listing disabled - return 403
+                        Response::forbidden_with_message(request.version, "Forbidden")
                     }
                 } else {
                     // Static file
                     let handler = StaticFileHandler::new(router);
-                    match handler.handle(&request) {
-                        Ok(response) => response,
-                        Err(_) => {
-                            // File not found or other error - use custom error page
-                            self.generate_error_response(
-                                server_instance,
-                                crate::http::status::StatusCode::NOT_FOUND,
-                                request.version,
-                            )?
-                        }
-                    }
+                    self.handle_with_error_fallback(
+                        handler,
+                        &request,
+                        server_instance,
+                        crate::http::status::StatusCode::NOT_FOUND,
+                    )?
                 }
             }
         } else {
@@ -594,19 +678,8 @@ impl ServerManager {
             }
         }
 
-        // Serialize response
-        let response_bytes = ResponseSerializer::serialize_auto(&response)?;
-
-        // Set keep-alive based on request and write response
-        {
-            let connection = self.get_connection_mut(fd)?;
-            connection.set_keep_alive(request.should_keep_alive());
-            connection.write_buffer_mut().extend(&response_bytes);
-            connection.set_state(ConnectionState::Writing);
-        }
-
-        // Register for write events
-        self.event_manager.register_write(fd, fd as usize)?;
+        // Write response to connection
+        self.write_response_to_connection(fd, &response, request.should_keep_alive())?;
 
         Ok(())
     }
@@ -618,27 +691,18 @@ impl ServerManager {
         status_code: crate::http::status::StatusCode,
         version: crate::http::version::Version,
     ) -> Result<()> {
-        // Find default server instance for error page
-        let server_instance = self.server_instances.first()
-            .ok_or_else(|| ServerError::HttpError("No server instances available".to_string()))?;
+        // Get connection to find the port it came in on
+        let port = self.get_connection_port(fd)?;
+        
+        // Find default server instance for this port
+        let server_idx = self.get_default_server_for_port(port)?;
+        let server_instance = self.get_server_instance(server_idx)?;
         
         // Generate error response
         let response = self.generate_error_response(server_instance, status_code, version)?;
         
-        // Serialize response
-        let response_bytes = ResponseSerializer::serialize_auto(&response)?;
-        
-        // Write response to connection buffer
-        {
-            let connection = self.get_connection_mut(fd)?;
-            connection.write_buffer_mut().extend(&response_bytes);
-            connection.set_state(ConnectionState::Writing);
-            // Don't keep connection alive after error
-            connection.set_keep_alive(false);
-        }
-        
-        // Register for write events
-        self.event_manager.register_write(fd, fd as usize)?;
+        // Write response to connection (don't keep connection alive after error)
+        self.write_response_to_connection(fd, &response, false)?;
         
         Ok(())
     }
@@ -658,24 +722,39 @@ impl ServerManager {
         error_handler.generate_error_response(status_code, version)
     }
 
-    /// Find server instance for a request based on Host header
-    fn find_server_for_request(&self, request: &Request) -> Result<usize> {
-        // Try to match by Host header
+    /// Handle a request handler and return response, falling back to error page on failure
+    /// Helper function to reduce redundancy in handler error handling
+    fn handle_with_error_fallback<H: RequestHandler>(
+        &self,
+        handler: H,
+        request: &Request,
+        server_instance: &ServerInstance,
+        error_status: crate::http::status::StatusCode,
+    ) -> Result<Response> {
+        match handler.handle(request) {
+            Ok(response) => Ok(response),
+            Err(_) => {
+                // Handler failed - use custom error page
+                self.generate_error_response(server_instance, error_status, request.version)
+            }
+        }
+    }
+
+    /// Find server instance for a request based on Host header and port
+    fn find_server_for_request(&self, request: &Request, port: u16) -> Result<usize> {
+        // Try to match by Host header and port
         if let Some(host) = request.host() {
             // Extract hostname (remove port if present)
-            let hostname = host.split(':').next().unwrap_or(host);
+            let hostname = host.split(':').next().unwrap_or(host).to_lowercase();
             
-            // Find server by name
-            for (idx, instance) in self.server_instances.iter().enumerate() {
-                if instance.server_name() == hostname {
-                    return Ok(idx);
-                }
+            // Look up server by (port, hostname)
+            if let Some(&server_idx) = self.server_lookup.get(&(port, hostname)) {
+                return Ok(server_idx);
             }
         }
 
-        // Fall back to default server for the port
-        // For now, return first server (we'll improve this later)
-        Ok(0)
+        // Fall back to default server for this port
+        self.get_default_server_for_port(port)
     }
 
     /// Handle write event - send response to client
@@ -699,9 +778,7 @@ impl ServerManager {
         if data.is_empty() {
             if let Err(e) = self.event_manager.unregister_write(fd) {
                 // Error unregistering - close connection
-                let connection = self.get_connection_mut(fd)?;
-                connection.set_state(ConnectionState::Closed);
-                self.close_connection(fd)?;
+                self.set_connection_state_and_close(fd, ConnectionState::Closed)?;
                 return Err(e);
             }
             return Ok(());
@@ -745,9 +822,7 @@ impl ServerManager {
                 // Unregister write after dropping connection reference
                 if let Err(e) = self.event_manager.unregister_write(fd) {
                     // Error unregistering - close connection
-                    let connection = self.get_connection_mut(fd)?;
-                    connection.set_state(ConnectionState::Closed);
-                    self.close_connection(fd)?;
+                    self.set_connection_state_and_close(fd, ConnectionState::Closed)?;
                     return Err(e);
                 }
             } else {
@@ -777,18 +852,36 @@ impl ServerManager {
     }
 
     /// Check if error is a body size violation
+    /// Checks for all possible body size error message patterns from the parser
     fn is_body_size_error(error: &ServerError) -> bool {
         if let ServerError::HttpError(ref msg) = error {
-            msg.contains("exceeds maximum allowed size")
+            // Match all body size error patterns used in RequestParser:
+            // - "exceeds maximum allowed size" (used in multiple places)
+            // - "would exceed maximum allowed size" (used in add_data and chunked parsing)
+            msg.contains("exceeds maximum allowed size") 
+                || msg.contains("would exceed maximum allowed size")
         } else {
             false
         }
     }
 
+    /// Get HTTP version from parser if available, otherwise default to HTTP/1.1
+    fn get_request_version_or_default(&self, _fd: i32) -> crate::http::version::Version {
+        // Try to get version from partially parsed request if available
+        // The parser's request field is private, so we default to HTTP/1.1
+        // This is acceptable since HTTP/1.1 is the most common version
+        crate::http::version::Version::Http11
+    }
+
     /// Close connection on error - helper to reduce code duplication
     fn close_connection_on_error(&mut self, fd: i32) -> Result<()> {
+        self.set_connection_state_and_close(fd, ConnectionState::Closed)
+    }
+
+    /// Set connection state and close connection (helper to reduce redundancy)
+    fn set_connection_state_and_close(&mut self, fd: i32, state: ConnectionState) -> Result<()> {
         if let Ok(connection) = self.get_connection_mut(fd) {
-            connection.set_state(ConnectionState::Closed);
+            connection.set_state(state);
         }
         self.close_connection(fd)
     }
