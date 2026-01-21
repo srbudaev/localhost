@@ -65,7 +65,7 @@ impl ServerManager {
         let poller = event_loop.poller();
         let event_manager = EventManager::new(poller);
 
-        let mut server_instances = Vec::new();
+        let mut server_instances: Vec<ServerInstance> = Vec::new();
         let mut default_servers = HashMap::new();
         let mut server_lookup = HashMap::new();
         let mut errors = Vec::new();
@@ -84,13 +84,31 @@ impl ServerManager {
             match ServerInstance::new_without_listeners(server_config.clone(), is_default) {
                 Ok(instance) => {
                     // Update default_servers with actual index in server_instances
+                    let current_server_idx = server_instances.len();
+                    let new_server_name = instance.server_name().to_string();
+                    
                     for port in instance.ports() {
                         if !default_servers.contains_key(&port) {
-                            default_servers.insert(port, server_instances.len());
+                            default_servers.insert(port, current_server_idx);
+                        } else {
+                            // Warn about multiple servers on same port
+                            // Note: We can't access server_instances here due to borrow checker,
+                            // so we'll log this after pushing the instance
+                            let existing_idx = default_servers[&port];
+                            // Store the existing server name for later warning
+                            let existing_server_name = server_instances[existing_idx].server_name().to_string();
+                            crate::common::logger::Logger::warn(&format!(
+                                "Multiple servers configured for port {}: '{}' (default) and '{}'. \
+                                Server selection will use Host header matching, falling back to '{}' if no match.",
+                                port,
+                                existing_server_name,
+                                new_server_name,
+                                existing_server_name
+                            ));
                         }
                         // Build server lookup: (port, hostname) -> server index
                         let hostname = instance.server_name().to_lowercase();
-                        server_lookup.insert((port, hostname), server_instances.len());
+                        server_lookup.insert((port, hostname), current_server_idx);
                     }
                     server_instances.push(instance);
                 }
@@ -241,7 +259,12 @@ impl ServerManager {
                     } else {
                         route.methods.join(", ")
                     };
-                    println!("    {} -> [{}]", path, methods);
+                    let redirect_info = if let Some(ref redirect) = route.redirect {
+                        format!(" -> redirect: {}", redirect)
+                    } else {
+                        String::new()
+                    };
+                    println!("    {} -> [{}]{}", path, methods, redirect_info);
                 }
             }
             
@@ -539,6 +562,17 @@ impl ServerManager {
         // Get connection to find the port it came in on
         let port = self.get_connection_port(fd)?;
         
+        // Log EVERY request at the very start
+        crate::common::logger::Logger::info(&format!(
+            "═══════════════════════════════════════════════════════════",
+        ));
+        crate::common::logger::Logger::info(&format!(
+            "📥 NEW REQUEST: {} {} on port {}",
+            request.method,
+            request.path(),
+            port
+        ));
+        
         // Find server instance based on Host header and port
         let server_idx = self.find_server_for_request(&request, port)?;
         let server_instance = self.get_server_instance(server_idx)?;
@@ -546,11 +580,66 @@ impl ServerManager {
         // Create router
         let router = Router::new(server_instance.config(), server_instance.root_path().clone());
         
+        // Log available routes for this server
+        let available_routes: Vec<String> = server_instance.config().routes
+            .iter()
+            .map(|(path, route)| {
+                let redirect_info = route.redirect.as_ref()
+                    .map(|r| format!(" -> redirect: {}", r))
+                    .unwrap_or_default();
+                format!("{}[{}]{}", path, route.methods.join(","), redirect_info)
+            })
+            .collect();
+        crate::common::logger::Logger::info(&format!(
+            "Server '{}' (idx: {}) has {} routes: [{}]",
+            server_instance.server_name(),
+            server_idx,
+            available_routes.len(),
+            available_routes.join(", ")
+        ));
+        
+        // Log the request path and which server instance is handling it
+        crate::common::logger::Logger::info(&format!(
+            "Processing request: {} {} (Host: {}) -> Server: '{}' (idx: {})",
+            request.method,
+            request.path(),
+            request.host().map(|h| h.as_str()).unwrap_or("none"),
+            server_instance.server_name(),
+            server_idx
+        ));
+        
         // Determine which handler to use based on route
-        let route = router.match_route(&request);
-        let response = if let Some(route) = route {
+        let route_match = router.match_route_with_path(&request);
+        let response = if let Some((matched_path, route)) = route_match {
+            // Log matched route with more details including which route path was matched
+            crate::common::logger::Logger::info(&format!(
+                "✓ Matched route '{}' for request '{}' on server '{}': redirect={:?}, directory={:?}, filename={:?}, methods={:?}",
+                matched_path,
+                request.path(),
+                server_instance.server_name(),
+                route.redirect,
+                route.directory,
+                route.filename,
+                route.methods
+            ));
+            
+            // Extra validation: warn if matched path doesn't match request path
+            if matched_path != request.path() && !request.path().starts_with(matched_path) {
+                crate::common::logger::Logger::warn(&format!(
+                    "⚠ Route mismatch detected! Request '{}' matched route '{}'",
+                    request.path(),
+                    matched_path
+                ));
+            }
+            
             // Check for redirect first (highest priority)
             if route.redirect.is_some() {
+                let redirect_value = route.redirect.as_ref().unwrap();
+                crate::common::logger::Logger::info(&format!(
+                    "→ Redirect detected! Route '{}' has redirect='{}', creating RedirectionHandler",
+                    matched_path,
+                    redirect_value
+                ));
                 use crate::application::handler::redirection_handler::RedirectionHandler;
                 let handler = RedirectionHandler::new(router);
                 handler.handle(&request)?
@@ -592,8 +681,17 @@ impl ServerManager {
                     );
                     cgi_handler.handle(&request)?
                 } else if file_path.is_dir() {
-                    // Check for default_file first before directory listing
-                    if let Some(default_file) = router.get_default_file(route) {
+                    // If directory_listing is enabled, show directory listing instead of default_file
+                    if router.is_directory_listing_enabled(route) {
+                        let handler = DirectoryListingHandler::new(router);
+                        self.handle_with_error_fallback(
+                            handler,
+                            &request,
+                            server_instance,
+                            crate::http::status::StatusCode::NOT_FOUND,
+                        )?
+                    } else if let Some(default_file) = router.get_default_file(route) {
+                        // Directory listing disabled, check for default_file
                         let default_path = file_path.join(default_file);
                         if crate::common::path_utils::is_valid_file(&default_path) {
                             // Serve default file via StaticFileHandler
@@ -604,28 +702,10 @@ impl ServerManager {
                                 server_instance,
                                 crate::http::status::StatusCode::NOT_FOUND,
                             )?
-                        } else if router.is_directory_listing_enabled(route) {
-                            // Default file doesn't exist, fall back to directory listing if enabled
-                            let handler = DirectoryListingHandler::new(router);
-                            self.handle_with_error_fallback(
-                                handler,
-                                &request,
-                                server_instance,
-                                crate::http::status::StatusCode::NOT_FOUND,
-                            )?
                         } else {
-                            // No default file and directory listing disabled - return 403
+                            // Default file doesn't exist and directory listing disabled - return 403
                             Response::forbidden_with_message(request.version, "Forbidden")
                         }
-                    } else if router.is_directory_listing_enabled(route) {
-                        // No default_file configured, check directory listing
-                        let handler = DirectoryListingHandler::new(router);
-                        self.handle_with_error_fallback(
-                            handler,
-                            &request,
-                            server_instance,
-                            crate::http::status::StatusCode::NOT_FOUND,
-                        )?
                     } else {
                         // No default_file and directory listing disabled - return 403
                         Response::forbidden_with_message(request.version, "Forbidden")
@@ -642,7 +722,12 @@ impl ServerManager {
                 }
             }
         } else {
-            // No route matched - return 404 with custom error page if configured
+            // No route matched - log and return 404
+            crate::common::logger::Logger::warn(&format!(
+                "No route matched for: {} {}",
+                request.method,
+                request.path()
+            ));
             self.generate_error_response(
                 server_instance,
                 crate::http::status::StatusCode::NOT_FOUND,
@@ -742,19 +827,118 @@ impl ServerManager {
 
     /// Find server instance for a request based on Host header and port
     fn find_server_for_request(&self, request: &Request, port: u16) -> Result<usize> {
+        // Log the raw Host header for debugging
+        let raw_host = request.host().map(|h| h.as_str()).unwrap_or("(missing)");
+        crate::common::logger::Logger::info(&format!(
+            "Server selection for {} {}: port={}, Host header='{}'",
+            request.method,
+            request.path(),
+            port,
+            raw_host
+        ));
+        
         // Try to match by Host header and port
         if let Some(host) = request.host() {
             // Extract hostname (remove port if present)
             let hostname = host.split(':').next().unwrap_or(host).to_lowercase();
             
-            // Look up server by (port, hostname)
-            if let Some(&server_idx) = self.server_lookup.get(&(port, hostname)) {
+            // Handle common localhost variations: 127.0.0.1 and ::1 should match "localhost"
+            let normalized_hostname = if hostname == "127.0.0.1" || hostname == "::1" || hostname == "[::1]" {
+                "localhost".to_string()
+            } else {
+                hostname.clone()
+            };
+            
+            // Log available servers for this port for debugging
+            let available_servers: Vec<String> = self.server_lookup
+                .iter()
+                .filter(|((p, _), _)| *p == port)
+                .map(|((_, h), idx)| {
+                    format!("'{}' (idx: {})", h, idx)
+                })
+                .collect();
+            
+            // Log default server for this port
+            let default_idx = self.default_servers.get(&port).copied();
+            let default_info = if let Some(idx) = default_idx {
+                if let Ok(server) = self.get_server_instance(idx) {
+                    format!("'{}' (idx: {})", server.server_name(), idx)
+                } else {
+                    format!("(idx: {})", idx)
+                }
+            } else {
+                "none".to_string()
+            };
+            
+            crate::common::logger::Logger::info(&format!(
+                "Looking for server match: Host header='{}' (normalized from '{}' -> '{}'), port={}, available servers: [{}], default: {}",
+                normalized_hostname,
+                hostname,
+                host,
+                port,
+                available_servers.join(", "),
+                default_info
+            ));
+            
+            // Try exact match first
+            if let Some(&server_idx) = self.server_lookup.get(&(port, normalized_hostname.clone())) {
+                let server_instance = self.get_server_instance(server_idx)?;
+                crate::common::logger::Logger::info(&format!(
+                    "Request {} {} -> Resolved server_name: '{}' (matched by Host header: '{}') on port {}",
+                    request.method,
+                    request.path(),
+                    server_instance.config().server_name,
+                    normalized_hostname,
+                    port
+                ));
                 return Ok(server_idx);
             }
+            
+            // Try original hostname if normalization changed it
+            if normalized_hostname != hostname {
+                if let Some(&server_idx) = self.server_lookup.get(&(port, hostname.clone())) {
+                    let server_instance = self.get_server_instance(server_idx)?;
+                    crate::common::logger::Logger::info(&format!(
+                        "Request {} {} -> Resolved server_name: '{}' (matched by Host header: '{}') on port {}",
+                        request.method,
+                        request.path(),
+                        server_instance.config().server_name,
+                        hostname,
+                        port
+                    ));
+                    return Ok(server_idx);
+                }
+            }
+            
+            crate::common::logger::Logger::warn(&format!(
+                "No server match found for Host header '{}' (normalized: '{}', original: '{}') on port {}, falling back to default server",
+                normalized_hostname,
+                hostname,
+                host,
+                port
+            ));
+        } else {
+            crate::common::logger::Logger::warn(&format!(
+                "No Host header present for request {} {} on port {}, falling back to default server",
+                request.method,
+                request.path(),
+                port
+            ));
         }
 
         // Fall back to default server for this port
-        self.get_default_server_for_port(port)
+        let server_idx = self.get_default_server_for_port(port)?;
+        let server_instance = self.get_server_instance(server_idx)?;
+        let host_header = request.host().map(|h| h.as_str()).unwrap_or("none");
+        crate::common::logger::Logger::info(&format!(
+            "Request {} {} -> Resolved server_name: '{}' (default server, Host header: '{}') on port {}",
+            request.method,
+            request.path(),
+            server_instance.config().server_name,
+            host_header,
+            port
+        ));
+        Ok(server_idx)
     }
 
     /// Handle write event - send response to client

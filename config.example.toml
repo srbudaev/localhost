@@ -5,7 +5,7 @@ client_max_body_size = 10485760
 server_address = "127.0.0.1"
 ports = [8080]
 server_name = "localhost"
-root = "./root/make-your-game"
+root = "./root"
 admin_access = false
 
 [servers.cgi_handlers]
@@ -44,8 +44,14 @@ upload_dir = "uploads"
 # Use redirect_type = "301" for permanent redirects, "302" for temporary (default)
 [servers.routes."/old"]
 methods = ["GET"]
-redirect = "/new"
+redirect = "https://google.com"
 redirect_type = "301"  # Permanent redirect (301), use "302" for temporary
+
+[servers.routes."/new"]
+methods = ["GET"]
+directory = "./static"
+default_file = "index_new.html"
+
 
 # Custom error pages
 # Error pages return the correct HTTP status code (404, 403, etc.) with custom HTML
@@ -65,13 +71,13 @@ redirect_type = "301"  # Permanent redirect (301), use "302" for temporary
 server_address = "127.0.0.1"
 
 # Listen on port 8081
-ports = [8081]
+ports = [8080]
 
 # Server name for Host header matching
 server_name = "anotherhost"
 
 # Document root directory
-root = "./root/cgi-bin"
+root = "./root"
 
 # Enable admin access
 admin_access = false
@@ -90,7 +96,7 @@ admin_access = false
 methods = ["GET", "POST", "DELETE"]
 directory = "."
 default_file = "index.html"
-directory_listing = true
+directory_listing = false
 
 # Static files directory
 [servers.routes."/static"]
@@ -108,13 +114,6 @@ cgi_extension = "py"
 [servers.routes."/upload"]
 methods = ["POST"]
 upload_dir = "uploads"
-
-# Redirect example (like nginx: return 301 /new-page)
-# Use redirect_type = "301" for permanent redirects, "302" for temporary (default)
-[servers.routes."/old"]
-methods = ["GET"]
-redirect = "/new"
-redirect_type = "301"  # Permanent redirect (301), use "302" for temporary
 
 # Custom error pages
 # Error pages return the correct HTTP status code (404, 403, etc.) with custom HTML

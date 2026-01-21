@@ -1,7 +1,6 @@
 use crate::application::config::models::{Config, RouteConfig, ServerConfig};
 use crate::common::error::{Result, ServerError};
 use std::collections::{HashMap, HashSet};
-use std::net::IpAddr;
 use std::path::Path;
 
 /// Validate configuration for correctness and consistency
@@ -49,25 +48,66 @@ fn validate_global_settings(config: &Config) -> Result<()> {
 }
 
 fn validate_port_conflicts(config: &Config) -> Result<()> {
-    let mut port_map: HashMap<(IpAddr, u16), Vec<usize>> = HashMap::new();
+    // Group servers by port (regardless of address first, to check address consistency)
+    let mut port_to_servers: HashMap<u16, Vec<usize>> = HashMap::new();
 
     for (idx, server) in config.servers.iter().enumerate() {
         for port in &server.ports {
-            let key = (server.server_address, *port);
-            port_map.entry(key).or_insert_with(Vec::new).push(idx);
+            port_to_servers.entry(*port).or_insert_with(Vec::new).push(idx);
         }
     }
 
-    for ((addr, port), indices) in port_map {
+    // Validate each port
+    for (port, indices) in port_to_servers {
         if indices.len() > 1 {
-            let server_names: Vec<String> = indices
-                .iter()
-                .map(|&idx| config.servers[idx].server_name.clone())
-                .collect();
-            return Err(ServerError::ConfigError(format!(
-                "Port conflict: {}:{} is used by multiple servers: {:?}",
-                addr, port, server_names
-            )));
+            // Multiple servers on same port - validate they have same address and unique server_name
+            let mut addresses = HashSet::new();
+            let mut server_names = Vec::new();
+            let mut name_set = HashSet::new();
+            
+            for &idx in &indices {
+                let server = &config.servers[idx];
+                addresses.insert(server.server_address);
+                let server_name = server.server_name.clone();
+                let server_name_lower = server_name.to_lowercase();
+                
+                // Check for duplicate server_name
+                if name_set.contains(&server_name_lower) {
+                    let conflicting_servers: Vec<String> = indices
+                        .iter()
+                        .map(|&i| config.servers[i].server_name.clone())
+                        .collect();
+                    return Err(ServerError::ConfigError(format!(
+                        "Port conflict: Port {} is used by multiple servers with duplicate server_name. \
+                        Servers sharing a port must have unique server_name values. \
+                        Servers: {:?}",
+                        port, conflicting_servers
+                    )));
+                }
+                
+                name_set.insert(server_name_lower);
+                server_names.push(server_name);
+            }
+            
+            // Check that all servers on the same port use the same address
+            if addresses.len() > 1 {
+                let server_info: Vec<String> = indices
+                    .iter()
+                    .map(|&i| {
+                        let s = &config.servers[i];
+                        format!("{} (server_name: {}, address: {})", i, s.server_name, s.server_address)
+                    })
+                    .collect();
+                return Err(ServerError::ConfigError(format!(
+                    "Port conflict: Port {} is used by servers with different addresses. \
+                    Servers sharing a port must use the same server_address. \
+                    Servers: {:?}",
+                    port, server_info
+                )));
+            }
+            
+            // All validations passed - servers can share the port with different server_name values
+            // They will be resolved by Host header matching
         }
     }
 
