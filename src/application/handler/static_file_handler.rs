@@ -60,7 +60,13 @@ impl RequestHandler for StaticFileHandler {
 
         // Check if it's a directory
         if file_path.is_dir() {
-            // Check for default file
+            // If directory listing is enabled, it should be handled by DirectoryListingHandler
+            // Don't serve default_file when directory_listing is enabled
+            if self.router.is_directory_listing_enabled(route) {
+                return Ok(Response::forbidden_with_message(request.version, "Forbidden"));
+            }
+            
+            // Directory listing disabled, check for default file
             if let Some(default_file) = self.router.get_default_file(route) {
                 let default_path = file_path.join(default_file);
                 if crate::common::path_utils::is_valid_file(&default_path) {
@@ -68,10 +74,7 @@ impl RequestHandler for StaticFileHandler {
                 }
             }
 
-            // Directory listing should be handled by DirectoryListingHandler in server_manager
-            // Return 403 if listing is disabled
-
-            // Directory without listing - return 403
+            // No default file and directory listing disabled - return 403
             return Ok(Response::forbidden_with_message(request.version, "Forbidden"));
         }
 

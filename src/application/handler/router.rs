@@ -20,10 +20,14 @@ impl Router {
         }
     }
 
-    /// Resolve path - if absolute/relative use as-is, otherwise join with root
+    /// Resolve path - if absolute use as-is, if relative (./) resolve relative to root_path, otherwise join with root
     pub fn resolve_path(&self, path: &str) -> PathBuf {
-        if path.starts_with('/') || path.starts_with("./") {
+        if path.starts_with('/') {
             PathBuf::from(path)
+        } else if path.starts_with("./") {
+            // Remove "./" prefix and resolve relative to root_path
+            let relative = &path[2..];
+            self.root_path.join(relative)
         } else {
             self.root_path.join(path)
         }
@@ -31,11 +35,18 @@ impl Router {
 
     /// Match a request to a route and return the route configuration
     pub fn match_route(&self, request: &Request) -> Option<&RouteConfig> {
+        self.match_route_with_path(request).map(|(_, config)| config)
+    }
+
+    /// Match a request to a route and return both the matched path and route configuration
+    pub fn match_route_with_path(&self, request: &Request) -> Option<(&String, &RouteConfig)> {
         let path = request.path();
 
         // Try exact match first
-        if let Some(route) = self.routes.get(path) {
-            return Some(route);
+        for (route_path, route_config) in &self.routes {
+            if route_path == path {
+                return Some((route_path, route_config));
+            }
         }
 
         // Try longest prefix match
@@ -52,7 +63,7 @@ impl Router {
             }
         }
 
-        best_match.map(|(_, config)| config)
+        best_match
     }
 
     /// Check if method is allowed for the route
