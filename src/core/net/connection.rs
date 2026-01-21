@@ -16,6 +16,8 @@ pub struct Connection {
     state: ConnectionState,
     timeout: Timeout,
     keep_alive: bool,
+    /// Server port this connection came in on (for virtual host routing)
+    server_port: Option<u16>,
 }
 
 impl Connection {
@@ -27,7 +29,28 @@ impl Connection {
             state: ConnectionState::Reading,
             timeout: Timeout::new(timeout_secs),
             keep_alive: false,
+            server_port: None,
         }
+    }
+
+    pub fn with_port(socket: ClientSocket, timeout_secs: u64, server_port: u16) -> Self {
+        Self {
+            socket,
+            read_buffer: Buffer::new(),
+            write_buffer: Buffer::new(),
+            state: ConnectionState::Reading,
+            timeout: Timeout::new(timeout_secs),
+            keep_alive: false,
+            server_port: Some(server_port),
+        }
+    }
+
+    pub fn server_port(&self) -> Option<u16> {
+        self.server_port
+    }
+
+    pub fn set_server_port(&mut self, port: u16) {
+        self.server_port = Some(port);
     }
 
     pub fn socket(&self) -> &ClientSocket {

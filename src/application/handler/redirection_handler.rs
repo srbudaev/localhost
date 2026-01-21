@@ -28,9 +28,13 @@ impl RequestHandler for RedirectionHandler {
         let redirect_target = route.redirect.as_ref()
             .ok_or_else(|| ServerError::HttpError("Route does not have redirect configured".to_string()))?;
 
-        // Create 302 Found (temporary redirect) response
-        // For permanent redirects (301), we could add a redirect_type field to RouteConfig
-        let mut response = Response::found(request.version);
+        // Determine redirect type: 301 (permanent) or 302 (temporary, default)
+        let redirect_type = route.redirect_type.as_deref().unwrap_or("302");
+        let mut response = if redirect_type == "301" {
+            Response::moved_permanently(request.version)
+        } else {
+            Response::found(request.version)
+        };
         
         // Set Location header
         // If redirect is relative, make it absolute based on request path

@@ -19,6 +19,7 @@ pub fn create_test_config(port: u16, body_size: usize) -> Config {
         filename: None,
         directory: None,
         redirect: None,
+        redirect_type: None,
         default_file: Some("index.html".to_string()),
         cgi_extension: None,
         directory_listing: true,

@@ -108,15 +108,16 @@ fn validate_server(server: &ServerConfig, index: usize) -> Result<()> {
         )));
     }
 
-    // Validate root directory exists
-    if !Path::new(&server.root).exists() {
+    // Validate root directory exists and is a directory
+    let root_path = Path::new(&server.root);
+    if !root_path.exists() {
         return Err(ServerError::ConfigError(format!(
             "Server {}: root directory '{}' does not exist",
             index, server.root
         )));
     }
 
-    if !Path::new(&server.root).is_dir() {
+    if !root_path.is_dir() {
         return Err(ServerError::ConfigError(format!(
             "Server {}: root '{}' is not a directory",
             index, server.root
@@ -131,12 +132,23 @@ fn validate_server(server: &ServerConfig, index: usize) -> Result<()> {
     // Validate error pages
     for (code, error_page) in &server.errors {
         validate_error_code(code)?;
-        if error_page.filename.is_empty() {
+        // Error pages should only have filename (redirects are handled via routes)
+        if error_page.filename.is_none() {
             return Err(ServerError::ConfigError(format!(
-                "Server {}: error page filename for {} cannot be empty",
+                "Server {}: error page for {} must specify 'filename'",
                 index, code
             )));
         }
+        // If filename is provided, it shouldn't be empty
+        if let Some(ref filename) = error_page.filename {
+            if filename.is_empty() {
+                return Err(ServerError::ConfigError(format!(
+                    "Server {}: error page filename for {} cannot be empty",
+                    index, code
+                )));
+            }
+        }
+        // Note: redirect in error pages is ignored - use route redirects instead
     }
 
     // Validate CGI handlers

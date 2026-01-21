@@ -63,7 +63,7 @@ impl RequestHandler for StaticFileHandler {
             // Check for default file
             if let Some(default_file) = self.router.get_default_file(route) {
                 let default_path = file_path.join(default_file);
-                if default_path.exists() && default_path.is_file() {
+                if crate::common::path_utils::is_valid_file(&default_path) {
                     return self.serve_file(&default_path, request.version);
                 }
             }

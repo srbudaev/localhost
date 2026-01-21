@@ -22,7 +22,14 @@ pub struct ServerInstance {
 
 impl ServerInstance {
     /// Create a new server instance from configuration
+    /// If create_listeners is false, listeners won't be created (for shared port scenarios)
     pub fn new(config: ServerConfig, is_default: bool) -> Result<Self> {
+        Self::new_without_listeners(config, is_default)
+    }
+
+    /// Create a new server instance without creating listeners
+    /// Used when listeners are managed at ServerManager level for shared ports
+    pub fn new_without_listeners(config: ServerConfig, is_default: bool) -> Result<Self> {
         // Resolve root path to absolute
         let root_path = std::fs::canonicalize(&config.root)
             .map_err(|e| {
@@ -40,21 +47,17 @@ impl ServerInstance {
             )));
         }
 
-        let mut instance = Self {
+        Ok(Self {
             config,
             root_path,
             listeners: HashMap::new(),
             is_default,
-        };
-
-        // Create listeners for each port
-        instance.create_listeners()?;
-
-        Ok(instance)
+        })
     }
 
     /// Create listeners for all configured ports
-    fn create_listeners(&mut self) -> Result<()> {
+    /// This is now optional - listeners can be created at ServerManager level
+    pub fn create_listeners(&mut self) -> Result<()> {
         for port in &self.config.ports {
             let addr = SocketAddr::new(self.config.server_address, *port);
             let listener = Listener::new(addr)?;

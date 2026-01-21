@@ -223,6 +223,7 @@ fn test_redirect() {
         filename: None,
         directory: None,
         redirect: Some("/new".to_string()),
+        redirect_type: None,
         default_file: None,
         cgi_extension: None,
         directory_listing: false,

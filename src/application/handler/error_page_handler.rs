@@ -13,12 +13,24 @@ pub struct ErrorPageHandler {
 }
 
 impl ErrorPageHandler {
+    /// Resolve error page path - helper to reduce redundancy with router's resolve_path
+    fn resolve_error_path(root_path: &PathBuf, path: &str) -> PathBuf {
+        if path.starts_with('/') || path.starts_with("./") {
+            PathBuf::from(path)
+        } else {
+            root_path.join(path)
+        }
+    }
+
     /// Create a new error page handler from server configuration
     pub fn new(config: &ServerConfig, root_path: PathBuf) -> Self {
         let error_pages: std::collections::HashMap<String, String> = config
             .errors
             .iter()
-            .map(|(code, error_config)| (code.clone(), error_config.filename.clone()))
+            .filter_map(|(code, error_config)| {
+                // Only include error pages with filenames
+                error_config.filename.as_ref().map(|filename| (code.clone(), filename.clone()))
+            })
             .collect();
 
         Self {
@@ -27,7 +39,8 @@ impl ErrorPageHandler {
         }
     }
 
-    /// Generate error response with custom error page if configured
+    /// Generate error response with custom error page
+    /// Returns the correct HTTP status code (404, 403, etc.) with custom error page if configured
     pub fn generate_error_response(
         &self,
         status_code: StatusCode,
@@ -37,20 +50,13 @@ impl ErrorPageHandler {
 
         // Try to find custom error page
         if let Some(error_file) = self.error_pages.get(&status_str) {
-            let error_path = if error_file.starts_with('/') || error_file.starts_with("./") {
-                PathBuf::from(error_file)
-            } else {
-                self.root_path.join(error_file)
-            };
+            let error_path = Self::resolve_error_path(&self.root_path, error_file);
 
             // Try to read custom error page
-            if error_path.exists() && error_path.is_file() {
+            if crate::common::path_utils::is_valid_file(&error_path) {
                 match fs::read(&error_path) {
                     Ok(content) => {
-                        let mut response = Response::new(version, status_code);
-                        response.set_content_type("text/html");
-                        response.set_body(content);
-                        return Ok(response);
+                        return Ok(Self::create_html_response(version, status_code, content));
                     }
                     Err(_) => {
                         // If file read fails, fall through to default error message
@@ -61,6 +67,14 @@ impl ErrorPageHandler {
 
         // Fall back to default error message
         self.generate_default_error_response(status_code, version)
+    }
+
+    /// Create HTML response with content (helper to reduce redundancy)
+    fn create_html_response(version: Version, status_code: StatusCode, content: Vec<u8>) -> Response {
+        let mut response = Response::new(version, status_code);
+        response.set_content_type("text/html");
+        response.set_body(content);
+        response
     }
 
     /// Generate default error response with standard message

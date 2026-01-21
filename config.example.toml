@@ -5,7 +5,7 @@ client_max_body_size = 10485760
 server_address = "127.0.0.1"
 ports = [8080]
 server_name = "localhost"
-root = "./root"
+root = "./root/make-your-game"
 admin_access = false
 
 [servers.cgi_handlers]
@@ -17,7 +17,7 @@ admin_access = false
 # Route definitions
 # Root route - serves files from root directory
 [servers.routes."/"]
-methods = ["GET", "POST"]
+methods = ["GET", "POST", "DELETE"]
 directory = "."
 default_file = "index.html"
 directory_listing = true
@@ -38,14 +38,18 @@ cgi_extension = "py"
 # File upload endpoint
 [servers.routes."/upload"]
 methods = ["POST"]
-upload_dir = "./uploads"
+upload_dir = "uploads"
 
-# Redirect example
+# Redirect example (like nginx: return 301 /new-page)
+# Use redirect_type = "301" for permanent redirects, "302" for temporary (default)
 [servers.routes."/old"]
 methods = ["GET"]
 redirect = "/new"
+redirect_type = "301"  # Permanent redirect (301), use "302" for temporary
 
 # Custom error pages
+# Error pages return the correct HTTP status code (404, 403, etc.) with custom HTML
+# For redirects, use route configuration instead (see redirect example above)
 [servers.errors]
 "400" = { filename = "errors/400.html" }
 "403" = { filename = "errors/403.html" }
@@ -67,7 +71,7 @@ ports = [8081]
 server_name = "anotherhost"
 
 # Document root directory
-root = "./root"
+root = "./root/cgi-bin"
 
 # Enable admin access
 admin_access = false
@@ -83,7 +87,7 @@ admin_access = false
 # Route definitions
 # Root route - serves files from root directory
 [servers.routes."/"]
-methods = ["GET", "POST"]
+methods = ["GET", "POST", "DELETE"]
 directory = "."
 default_file = "index.html"
 directory_listing = true
@@ -103,14 +107,18 @@ cgi_extension = "py"
 # File upload endpoint
 [servers.routes."/upload"]
 methods = ["POST"]
-upload_dir = "./uploads"
+upload_dir = "uploads"
 
-# Redirect example
+# Redirect example (like nginx: return 301 /new-page)
+# Use redirect_type = "301" for permanent redirects, "302" for temporary (default)
 [servers.routes."/old"]
 methods = ["GET"]
 redirect = "/new"
+redirect_type = "301"  # Permanent redirect (301), use "302" for temporary
 
 # Custom error pages
+# Error pages return the correct HTTP status code (404, 403, etc.) with custom HTML
+# For redirects, use route configuration instead (see redirect example above)
 [servers.errors]
 "400" = { filename = "errors/400.html" }
 "403" = { filename = "errors/403.html" }
@@ -119,3 +127,47 @@ redirect = "/new"
 "413" = { filename = "errors/413.html" }
 "500" = { filename = "errors/500.html" }
 
+
+# Third server instance for testing HTTP methods on port 8082
+[[servers]]
+server_address = "127.0.0.1"
+ports = [8082]
+server_name = "test-server"
+root = "./root"
+admin_access = false
+
+[servers.cgi_handlers]
+".py" = "python3"
+".sh" = "/bin/sh"
+".pl" = "perl"
+".rb" = "ruby"
+
+# Route definitions
+[servers.routes."/"]
+methods = ["GET", "POST", "DELETE"]
+directory = "."
+default_file = "test-methods.html"
+directory_listing = true
+
+# Upload endpoint
+[servers.routes."/upload"]
+methods = ["POST"]
+upload_dir = "uploads"
+
+# CGI scripts directory
+[servers.routes."/cgi-bin"]
+methods = ["GET", "POST"]
+directory = "cgi-bin"
+cgi_extension = "py"
+
+# Custom error pages
+# Custom error pages
+# Error pages return the correct HTTP status code (404, 403, etc.) with custom HTML
+# For redirects, use route configuration instead (see redirect example above)
+[servers.errors]
+"400" = { filename = "errors/400.html" }
+"403" = { filename = "errors/403.html" }
+"404" = { filename = "errors/404.html" }
+"405" = { filename = "errors/405.html" }
+"413" = { filename = "errors/413.html" }
+"500" = { filename = "errors/500.html" }
