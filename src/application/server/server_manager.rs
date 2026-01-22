@@ -644,10 +644,19 @@ impl ServerManager {
                 let handler = RedirectionHandler::new(router);
                 handler.handle(&request)?
             } else if request.method == crate::http::method::Method::DELETE {
-                // DELETE request - handle file deletion
-                use crate::application::handler::delete_handler::DeleteHandler;
-                let handler = DeleteHandler::new(router);
-                handler.handle(&request)?
+                // DELETE request - check if route allows DELETE method
+                if router.is_method_allowed(&request, route) {
+                    // DELETE request - handle file deletion
+                    use crate::application::handler::delete_handler::DeleteHandler;
+                    let handler = DeleteHandler::new(router);
+                    handler.handle(&request)?
+                } else {
+                    // Route doesn't allow DELETE method
+                    Response::method_not_allowed_with_message(
+                        request.version,
+                        "Method Not Allowed"
+                    )
+                }
             } else if route.upload_dir.is_some() && request.method == crate::http::method::Method::POST {
                 // File upload - check upload_dir before other handlers
                 use crate::application::handler::upload_handler::UploadHandler;

@@ -21,6 +21,7 @@ impl DeleteHandler {
     /// Safely delete a file
     fn delete_file(&self, file_path: &Path, version: crate::http::version::Version) -> Result<Response> {
         // Check if file exists
+        println!("file_path: {}", file_path.display());
         if !file_path.exists() {
             return Ok(Response::not_found_with_message(version, "File not found"));
         }
@@ -74,14 +75,21 @@ impl RequestHandler for DeleteHandler {
             ));
         }
 
-        // Validate route and method
-        let (route, error_response) = self.router.validate_request(request)?;
-        if let Some(response) = error_response {
-            return Ok(response);
-        }
+        // Match route (without method validation since DELETE was already checked by server manager)
+        // We still need to match the route to get the file path, but we skip method validation
+        let route = self.router.match_route(request)
+            .ok_or_else(|| crate::common::error::ServerError::HttpError("No matching route".to_string()))?;
 
         // Resolve file path
         let file_path = self.router.resolve_file_path(request, route)?;
+        
+        // Log the resolved path for debugging
+        crate::common::logger::Logger::info(&format!(
+            "DeleteHandler: Request path='{}', Resolved file path='{}', exists={}",
+            request.path(),
+            file_path.display(),
+            file_path.exists()
+        ));
 
         // Delete the file
         self.delete_file(&file_path, request.version)
