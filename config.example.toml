@@ -10,9 +10,7 @@ admin_access = false
 
 [servers.cgi_handlers]
 ".py" = "python3"     
-".sh" = "/bin/sh"      
-".pl" = "perl"         
-".rb" = "ruby"         
+".sh" = "/bin/sh"         
 
 # Route definitions
 # Root route - serves files from root directory
@@ -27,13 +25,19 @@ directory_listing = true
 methods = ["GET"]
 directory = "./static"
 default_file = "index.html"
-directory_listing = false
+directory_listing = true
 
 # CGI scripts directory
 [servers.routes."/cgi-bin"]
 methods = ["GET", "POST"]
 directory = "cgi-bin"
 cgi_extension = "py"
+directory_listing = false
+
+# CGI form page
+[servers.routes."/cgi-bin.html"]
+methods = ["GET"]
+filename = "cgi-bin.html"
 
 # File upload endpoint
 [servers.routes."/upload"]
@@ -71,7 +75,7 @@ default_file = "index_new.html"
 server_address = "127.0.0.1"
 
 # Listen on port 8081
-ports = [8081]
+ports = [8080]
 
 # Server name for Host header matching
 server_name = "anotherhost"
@@ -87,8 +91,6 @@ admin_access = false
 [servers.cgi_handlers]
 ".py" = "python3"      # Python scripts
 ".sh" = "/bin/sh"      # Shell scripts
-".pl" = "perl"         # Perl scripts
-".rb" = "ruby"         # Ruby scripts
 
 # Route definitions
 # Root route - serves files from root directory
@@ -138,8 +140,6 @@ admin_access = false
 [servers.cgi_handlers]
 ".py" = "python3"
 ".sh" = "/bin/sh"
-".pl" = "perl"
-".rb" = "ruby"
 
 # Route definitions
 [servers.routes."/"]
