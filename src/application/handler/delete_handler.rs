@@ -21,7 +21,6 @@ impl DeleteHandler {
     /// Safely delete a file
     fn delete_file(&self, file_path: &Path, version: crate::http::version::Version) -> Result<Response> {
         // Check if file exists
-        println!("file_path: {}", file_path.display());
         if !file_path.exists() {
             return Ok(Response::not_found_with_message(version, "File not found"));
         }

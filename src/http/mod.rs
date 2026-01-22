@@ -6,7 +6,6 @@ pub mod status;
 pub mod headers;
 pub mod method;
 pub mod version;
-pub mod body;
 pub mod cookie;
 
 pub use method::Method;

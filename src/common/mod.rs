@@ -3,6 +3,5 @@ pub mod time;
 pub mod buffer;
 pub mod error;
 pub mod constants;
-pub mod traits;
 pub mod path_utils;
 

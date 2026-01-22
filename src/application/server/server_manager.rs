@@ -351,7 +351,7 @@ impl ServerManager {
             Ok(Some(client_socket)) => {
                 let client_fd = client_socket.as_raw_fd();
                 // Create connection with port tracking
-                let connection = Connection::with_port(client_socket, 30, port); // 30 second timeout
+                let connection = Connection::with_port(client_socket, crate::common::constants::DEFAULT_REQUEST_TIMEOUT_SECS, port);
                 let parser = RequestParser::with_max_body_size(self.max_body_size);
 
                 self.connections.insert(client_fd, connection);
@@ -519,8 +519,7 @@ impl ServerManager {
         if let Err(e) = self.get_parser_mut(fd)?.add_data(&buf[..n]) {
             // Body size error - send 413 response
             if Self::is_body_size_error(&e) {
-                let version = self.get_request_version_or_default(fd);
-                return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, version);
+                return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
             }
             // Other error - close connection
             self.close_connection_on_error(fd)?;
@@ -544,9 +543,7 @@ impl ServerManager {
                 // Check if it's a body size error
                 if Self::is_body_size_error(&e) {
                     // Send 413 Payload Too Large response
-                    // Try to get HTTP version from parser if available
-                    let version = self.get_request_version_or_default(fd);
-                    return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, version);
+                    return self.send_error_response(fd, crate::http::status::StatusCode::PAYLOAD_TOO_LARGE, crate::http::version::Version::Http11);
                 }
                 // Other parse error - close connection
                 self.close_connection_on_error(fd)?;
@@ -1058,13 +1055,6 @@ impl ServerManager {
         }
     }
 
-    /// Get HTTP version from parser if available, otherwise default to HTTP/1.1
-    fn get_request_version_or_default(&self, _fd: i32) -> crate::http::version::Version {
-        // Try to get version from partially parsed request if available
-        // The parser's request field is private, so we default to HTTP/1.1
-        // This is acceptable since HTTP/1.1 is the most common version
-        crate::http::version::Version::Http11
-    }
 
     /// Close connection on error - helper to reduce code duplication
     fn close_connection_on_error(&mut self, fd: i32) -> Result<()> {

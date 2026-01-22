@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CGI Input Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-get {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .btn-get:hover {
+            background-color: #45a049;
+        }
+        .btn-post {
+            background-color: #2196F3;
+            color: white;
+        }
+        .btn-post:hover {
+            background-color: #0b7dda;
+        }
+        .info {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>CGI Input Form</h1>
+    <div class="form-container">
+        <form id="cgiForm" method="POST" action="/cgi-bin/echo.py">
+            <div class="form-group">
+                <label for="input">Enter your message:</label>
+                <input type="text" id="input" name="input" placeholder="Type something here..." required>
+            </div>
+            <div class="button-group">
+                <button type="submit" class="btn-post">Submit via POST</button>
+                <button type="button" class="btn-get" onclick="submitViaGet()">Submit via GET</button>
+            </div>
+        </form>
+        
+        <div class="info">
+            <h3>How it works:</h3>
+            <ul>
+                <li><strong>POST method:</strong> Data is sent in the request body and read from stdin by the CGI script</li>
+                <li><strong>GET method:</strong> Data is sent as a query string (<code>?input=your+text</code>) and read from QUERY_STRING environment variable</li>
+                <li>The CGI script (<code>/cgi-bin/echo.py</code>) processes the input and generates an HTML response</li>
+            </ul>
+            <p><strong>Try it:</strong> Enter some text and click either button to see how the CGI script handles your input!</p>
+        </div>
+    </div>
+
+    <script>
+        function submitViaGet() {
+            const input = document.getElementById('input').value;
+            if (input.trim() === '') {
+                alert('Please enter some text first!');
+                return;
+            }
+            const encodedInput = encodeURIComponent(input);
+            window.location.href = `/cgi-bin/echo.py?input=${encodedInput}`;
+        }
+    </script>
+</body>
+</html>
