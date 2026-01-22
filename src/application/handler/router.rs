@@ -24,6 +24,9 @@ impl Router {
     pub fn resolve_path(&self, path: &str) -> PathBuf {
         if path.starts_with('/') {
             PathBuf::from(path)
+        } else if path == "." {
+            // "." means root directory
+            self.root_path.clone()
         } else if path.starts_with("./") {
             // Remove "./" prefix and resolve relative to root_path
             let relative = &path[2..];
@@ -50,9 +53,27 @@ impl Router {
         }
 
         // Try longest prefix match
+        // A route matches if:
+        // 1. Path exactly equals route path, OR
+        // 2. Path starts with route path followed by '/' (for subdirectories/files)
+        // Special case: "/" route matches everything
         let mut best_match: Option<(&String, &RouteConfig)> = None;
         for (route_path, route_config) in &self.routes {
-            if path.starts_with(route_path) {
+            let matches = if path == *route_path {
+                true
+            } else if route_path == "/" {
+                // Root route matches everything
+                path.starts_with("/")
+            } else if path.starts_with(route_path) {
+                // For other routes, check if route path is followed by '/' or is at the end
+                // This prevents "/upload" from matching "/uploads/filename"
+                let remaining = &path[route_path.len()..];
+                remaining.is_empty() || remaining.starts_with('/')
+            } else {
+                false
+            };
+            
+            if matches {
                 if let Some((best_path, _)) = &best_match {
                     if route_path.len() > best_path.len() {
                         best_match = Some((route_path, route_config));
@@ -118,6 +139,8 @@ impl Router {
             let dir_path = self.resolve_path(directory);
 
             let file_path = if relative_path.is_empty() {
+                // Always return the directory path, not default_file
+                // The server manager will decide whether to show directory listing or serve default_file
                 dir_path
             } else {
                 // Sanitize path to prevent directory traversal
@@ -136,6 +159,8 @@ impl Router {
         };
 
         if relative_path.is_empty() {
+            // Always return the root directory path, not default_file
+            // The server manager will decide whether to show directory listing or serve default_file
             Ok(self.root_path.clone())
         } else {
             let sanitized = self.sanitize_path(relative_path)?;

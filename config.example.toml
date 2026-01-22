@@ -71,7 +71,7 @@ default_file = "index_new.html"
 server_address = "127.0.0.1"
 
 # Listen on port 8081
-ports = [8080]
+ports = [8081]
 
 # Server name for Host header matching
 server_name = "anotherhost"
@@ -146,7 +146,7 @@ admin_access = false
 methods = ["GET", "POST", "DELETE"]
 directory = "."
 default_file = "test-methods.html"
-directory_listing = true
+directory_listing = false
 
 # Upload endpoint
 [servers.routes."/upload"]
