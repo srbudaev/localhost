@@ -1,0 +1,9 @@
+------WebKitFormBoundarypsvvUNGBaOnOh18E
+Content-Disposition: form-data; name="file"; filename="test.txt"
+Content-Type: text/plain
+
+Hello, this is a test file!
+Created via POST request.
+
+You can write any text here and it will be saved to a file.
+------WebKitFormBoundarypsvvUNGBaOnOh18E--
