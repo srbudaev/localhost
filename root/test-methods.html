@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP Methods Test - Port 8082</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .method-section {
+            margin-bottom: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .method-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .method-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .badge-get {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .badge-post {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .badge-delete {
+            background: #f44336;
+            color: white;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input[type="text"],
+        input[type="file"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="file"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        input[type="file"] {
+            cursor: pointer;
+        }
+        
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.1s;
+            font-weight: 500;
+            margin-right: 10px;
+            margin-top: 5px;
+        }
+        
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.danger {
+            background: #f44336;
+        }
+        
+        button.danger:hover {
+            background: #d32f2f;
+        }
+        
+        button.small {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+        
+        .response-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 6px;
+            border: 2px solid #e0e0e0;
+            min-height: 100px;
+        }
+        
+        .response-label {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .response-content {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #333;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .info-box p {
+            margin: 5px 0;
+            color: #1976d2;
+        }
+        
+        .file-list {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .file-name {
+            font-family: 'Courier New', monospace;
+            font-weight: 500;
+            color: #333;
+            flex: 1;
+        }
+        
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .refresh-btn {
+            background: #6c757d;
+            margin-bottom: 10px;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP Methods Test Page</h1>
+        <p class="subtitle">Test GET, POST, and DELETE methods on port 8082</p>
+        
+        <div class="info-box">
+            <p><strong>Server:</strong> test-server (Port 8082)</p>
+            <p><strong>Supported Methods:</strong> GET, POST, DELETE</p>
+            <p><strong>Route:</strong> /</p>
+        </div>
+        
+        <!-- GET Method Section -->
+        <div class="method-section">
+            <div class="method-title">
+                <span class="method-badge badge-get">GET</span>
+                GET Request Test
+            </div>
+            <p style="margin-bottom: 15px; color: #666;">
+                GET requests retrieve data from the server. Click the button below to test a GET request.
+            </p>
+            <button onclick="testGet()">Send GET Request</button>
+            <div class="response-section" id="get-response">
+                <span class="response-label">Response:</span>
+                <div class="response-content">Click the button above to test GET request</div>
+            </div>
+        </div>
+        
+        <!-- POST Method Section -->
+        <div class="method-section">
+            <div class="method-title">
+                <span class="method-badge badge-post">POST</span>
+                POST Request - Upload File
+            </div>
+            <p style="margin-bottom: 15px; color: #666;">
+                Choose a file from your computer to upload. The file will be saved via POST request to /upload endpoint.
+                Supported file types: images (PNG, JPEG, GIF, WebP, SVG), documents (PDF, TXT, HTML, CSS, JS, JSON, XML), archives (ZIP), videos (MP4), and audio (MP3).
+            </p>
+            <div class="form-group">
+                <label for="file-input">Select file to upload:</label>
+                <input type="file" id="file-input" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 1em; background: white; cursor: pointer;">
+            </div>
+            <div class="form-group" id="file-info" style="display: none; padding: 10px; background: #e3f2fd; border-radius: 4px; margin-top: 10px;">
+                <strong>Selected file:</strong> <span id="file-name"></span><br>
+                <strong>File size:</strong> <span id="file-size"></span><br>
+                <strong>File type:</strong> <span id="file-type"></span>
+            </div>
+            <button onclick="testPost()">Upload File (POST)</button>
+            <div class="response-section" id="post-response">
+                <span class="response-label">Response:</span>
+                <div class="response-content">Select a file above and click the button to upload it</div>
+            </div>
+        </div>
+        
+        <!-- DELETE Method Section -->
+        <div class="method-section">
+            <div class="method-title">
+                <span class="method-badge badge-delete">DELETE</span>
+                DELETE Request - Delete Files in Root Directory
+            </div>
+            <p style="margin-bottom: 15px; color: #666;">
+                Delete any file in the root directory. Click "Refresh File List" to see available files, then click "Delete" next to any file to remove it.
+            </p>
+            <button class="refresh-btn" onclick="refreshFileList()">🔄 Refresh File List</button>
+            <div class="file-list" id="file-list">
+                <div style="text-align: center; color: #666; padding: 20px;">
+                    Click "Refresh File List" to see files in root directory
+                </div>
+            </div>
+            <div class="response-section" id="delete-response">
+                <span class="response-label">Response:</span>
+                <div class="response-content">Refresh the file list above and click Delete on any file</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function testGet() {
+            const responseDiv = document.getElementById('get-response');
+            const contentDiv = responseDiv.querySelector('.response-content');
+            
+            contentDiv.textContent = 'Sending GET request...';
+            
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/html,application/json'
+                    }
+                });
+                
+                const status = response.status;
+                const statusText = response.statusText;
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                let body;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    body = await response.json();
+                } else {
+                    body = await response.text();
+                }
+                
+                contentDiv.textContent = `Status: ${status} ${statusText}\n\nHeaders:\n${JSON.stringify(headers, null, 2)}\n\nBody:\n${typeof body === 'string' ? body.substring(0, 500) + '...' : JSON.stringify(body, null, 2)}`;
+            } catch (error) {
+                contentDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        async function testPost() {
+            const responseDiv = document.getElementById('post-response');
+            const contentDiv = responseDiv.querySelector('.response-content');
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                contentDiv.textContent = 'Error: Please select a file to upload';
+                return;
+            }
+            
+            contentDiv.textContent = `Uploading file "${file.name}" (${formatFileSize(file.size)})...`;
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const status = response.status;
+                const statusText = response.statusText;
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                let body;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    body = await response.json();
+                } else {
+                    body = await response.text();
+                }
+                
+                let resultText = `Status: ${status} ${statusText}\n\n`;
+                
+                if (status === 201 || status === 200) {
+                    resultText += `✓ File uploaded successfully!\n\n`;
+                    if (body.filename) {
+                        resultText += `Saved as: ${body.filename}\n`;
+                    }
+                    if (body.mime_type) {
+                        resultText += `MIME type: ${body.mime_type}\n`;
+                    }
+                    resultText += '\n';
+                } else {
+                    resultText += `✗ Upload failed.\n\n`;
+                }
+                
+                resultText += `Headers:\n${JSON.stringify(headers, null, 2)}\n\nBody:\n${typeof body === 'string' ? body : JSON.stringify(body, null, 2)}`;
+                
+                contentDiv.textContent = resultText;
+                
+                // Refresh file list after successful upload
+                if (status === 201 || status === 200) {
+                    setTimeout(() => refreshFileList(), 500);
+                }
+            } catch (error) {
+                contentDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        async function refreshFileList() {
+            const fileListDiv = document.getElementById('file-list');
+            
+            // Show manual entry form - user can enter any filename in root directory
+            fileListDiv.innerHTML = `
+                <div style="margin-bottom: 15px; color: #333;">
+                    <strong>Delete any file in the root directory:</strong>
+                    <p style="margin-top: 5px; font-size: 0.9em; color: #666;">
+                        Enter the filename (e.g., "test.txt", "myfile.html") or path from root (e.g., "uploads/file.txt")
+                    </p>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="custom-filename" placeholder="Enter filename (e.g., test.txt)" style="flex: 1; padding: 10px;">
+                    <button class="danger" onclick="deleteCustomFile()">Delete File</button>
+                </div>
+                <div style="background: #fff3cd; padding: 10px; border-radius: 4px; border-left: 3px solid #ffc107;">
+                    <strong>⚠️ Warning:</strong> This will permanently delete the file. Make sure you enter the correct filename.
+                </div>
+            `;
+        }
+        
+        function deleteCustomFile() {
+            const filename = document.getElementById('custom-filename').value.trim();
+            if (!filename) {
+                alert('Please enter a filename');
+                return;
+            }
+            deleteFile(filename);
+        }
+        
+        async function deleteFile(filename) {
+            const responseDiv = document.getElementById('delete-response');
+            const contentDiv = responseDiv.querySelector('.response-content');
+            
+            // Ensure filename doesn't start with / for root files
+            const path = filename.startsWith('/') ? filename : '/' + filename;
+            
+            contentDiv.textContent = `Deleting file: ${path}...`;
+            
+            try {
+                const response = await fetch(path, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json,text/html'
+                    }
+                });
+                
+                const status = response.status;
+                const statusText = response.statusText;
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                let body;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    body = await response.json();
+                } else {
+                    body = await response.text();
+                }
+                
+                let resultText = `Status: ${status} ${statusText}\n\n`;
+                
+                if (status === 200 || status === 204) {
+                    resultText += `✓ File "${filename}" deleted successfully!\n\n`;
+                } else if (status === 404) {
+                    resultText += `✗ File "${filename}" not found.\n\n`;
+                } else if (status === 403) {
+                    resultText += `✗ Permission denied or "${filename}" is a directory (DELETE only works on files).\n\n`;
+                } else {
+                    resultText += `✗ Failed to delete file.\n\n`;
+                }
+                
+                resultText += `Headers:\n${JSON.stringify(headers, null, 2)}\n\nBody:\n${typeof body === 'string' ? body : JSON.stringify(body, null, 2)}`;
+                
+                contentDiv.textContent = resultText;
+                
+                // Refresh file list after deletion
+                if (status === 200 || status === 204) {
+                    setTimeout(() => refreshFileList(), 500);
+                }
+            } catch (error) {
+                contentDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Load file list on page load and setup file input listener
+        window.addEventListener('DOMContentLoaded', () => {
+            refreshFileList();
+            
+            // Update file info when file is selected
+            const fileInput = document.getElementById('file-input');
+            const fileInfo = document.getElementById('file-info');
+            const fileName = document.getElementById('file-name');
+            const fileSize = document.getElementById('file-size');
+            const fileType = document.getElementById('file-type');
+            
+            if (fileInput) {
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        fileName.textContent = file.name;
+                        fileSize.textContent = formatFileSize(file.size);
+                        fileType.textContent = file.type || 'Unknown';
+                        fileInfo.style.display = 'block';
+                    } else {
+                        fileInfo.style.display = 'none';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
