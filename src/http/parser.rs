@@ -390,6 +390,10 @@ impl Default for RequestParser {
 mod tests {
     use super::*;
 
+    // -----------------------------------------------------------------------
+    // Request line / headers
+    // -----------------------------------------------------------------------
+
     #[test]
     fn test_parse_simple_request() {
         let request_str = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
@@ -398,5 +402,222 @@ mod tests {
         let request = parser.parse().unwrap().unwrap();
         assert_eq!(request.method, Method::GET);
         assert_eq!(request.path(), "/");
+        assert_eq!(request.version, Version::Http11);
+    }
+
+    #[test]
+    fn test_parse_request_with_query_string() {
+        let request_str = "GET /search?q=rust&page=2 HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.path(), "/search");
+        assert_eq!(request.query_params.get("q").map(String::as_str), Some("rust"));
+        assert_eq!(request.query_params.get("page").map(String::as_str), Some("2"));
+    }
+
+    #[test]
+    fn test_parse_headers_case_insensitive_lookup() {
+        let request_str =
+            "GET / HTTP/1.1\r\nHost: example.com\r\nContent-Type: text/plain\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.host().map(String::as_str), Some("example.com"));
+        assert!(request.headers.get("content-type").is_some());
+        assert!(request.headers.get("CONTENT-TYPE").is_some());
+    }
+
+    #[test]
+    fn test_parse_invalid_method_returns_error() {
+        let request_str = "FROBNICATE / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let result = parser.parse();
+        assert!(result.is_err(), "invalid method must produce ParseError");
+    }
+
+    #[test]
+    fn test_parse_invalid_version_returns_error() {
+        let request_str = "GET / HTTP/2.0\r\nHost: localhost\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let result = parser.parse();
+        assert!(
+            result.is_err(),
+            "non HTTP/1.1 version must produce ParseError"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Body with Content-Length (audit-required: "body content … extracted")
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_parse_post_with_content_length() {
+        let body = "hello=world&foo=bar";
+        let request_str = format!(
+            "POST /submit HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.method, Method::POST);
+        assert_eq!(request.body, body.as_bytes());
+    }
+
+    #[test]
+    fn test_parse_post_incremental_body() {
+        // Add data in two chunks - parser must wait, then complete.
+        let body = "abcdefghij";
+        let mut parser = RequestParser::new();
+
+        let head = format!(
+            "POST / HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\n\r\nabcde",
+            body.len()
+        );
+        parser.add_data(head.as_bytes()).unwrap();
+        assert!(parser.parse().unwrap().is_none(), "body incomplete");
+
+        parser.add_data(b"fghij").unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.body, body.as_bytes());
+    }
+
+    // -----------------------------------------------------------------------
+    // Chunked encoding (audit-required: "including chunked encoding")
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_parse_chunked_body_single_chunk() {
+        // One 5-byte chunk "Hello" followed by terminator chunk "0\r\n\r\n".
+        let request_str = "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n\
+                           5\r\nHello\r\n\
+                           0\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.body, b"Hello");
+    }
+
+    #[test]
+    fn test_parse_chunked_body_multiple_chunks() {
+        // Multiple chunks: "Wiki" + "pedia" + " in\r\n\r\nchunks." (with size 0xE = 14 incl CRLF inside).
+        // Use simpler payload to keep arithmetic obvious.
+        let request_str = "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n\
+                           4\r\nWiki\r\n\
+                           5\r\npedia\r\n\
+                           e\r\n in\r\n\r\nchunks.\r\n\
+                           0\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.body, b"Wikipedia in\r\n\r\nchunks.");
+    }
+
+    #[test]
+    fn test_parse_chunked_body_with_chunk_extensions() {
+        // Per RFC 7230 §4.1.1, a chunk size may be followed by ";<extension>".
+        // The parser must strip everything after ';' on the size line.
+        let request_str = "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n\
+                           5;name=val\r\nHello\r\n\
+                           0\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.body, b"Hello");
+    }
+
+    #[test]
+    fn test_parse_chunked_body_empty() {
+        // Only the terminating zero-length chunk - no payload.
+        let request_str = "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n\
+                           0\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert!(request.body.is_empty());
+    }
+
+    #[test]
+    fn test_parse_chunked_invalid_size_returns_error() {
+        let request_str = "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n\
+                           ZZZZ\r\nHello\r\n\
+                           0\r\n\r\n";
+        let mut parser = RequestParser::new();
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let result = parser.parse();
+        assert!(result.is_err(), "non-hex chunk size must fail");
+    }
+
+    #[test]
+    fn test_parse_chunked_body_incremental() {
+        // Feed in three slices, ensure parser is happy to wait for more data.
+        let parts: &[&[u8]] = &[
+            b"POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n",
+            b"5\r\nHello\r\n",
+            b"6\r\n World\r\n0\r\n\r\n",
+        ];
+        let mut parser = RequestParser::new();
+
+        parser.add_data(parts[0]).unwrap();
+        assert!(parser.parse().unwrap().is_none());
+
+        parser.add_data(parts[1]).unwrap();
+        assert!(parser.parse().unwrap().is_none());
+
+        parser.add_data(parts[2]).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.body, b"Hello World");
+    }
+
+    // -----------------------------------------------------------------------
+    // Body size limit (audit-required: "out-of-bounds body size limits")
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_body_too_large_with_content_length_rejected() {
+        // Limit = 16 bytes, declared Content-Length = 100 → must error in
+        // prepare_body_parsing (check_body_size_limit on the declared length).
+        let mut parser = RequestParser::with_max_body_size(16);
+        let head = "POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\n";
+        parser.add_data(head.as_bytes()).unwrap();
+        let result = parser.parse();
+        assert!(
+            result.is_err(),
+            "declared body larger than limit must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_body_too_large_with_chunked_rejected() {
+        // Limit = 4 bytes, chunked payload of 5 bytes → must error in
+        // parse_chunked_body (check_would_exceed_limit on the chunk size).
+        let mut parser = RequestParser::with_max_body_size(4);
+        let request_str = "POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n\
+                           5\r\nHello\r\n\
+                           0\r\n\r\n";
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let result = parser.parse();
+        assert!(
+            result.is_err(),
+            "chunked body larger than limit must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_body_exactly_at_limit_accepted() {
+        // body size == max_body_size is allowed (limit is inclusive).
+        let body = b"abcdef";
+        let mut parser = RequestParser::with_max_body_size(body.len());
+        let request_str = format!(
+            "POST / HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\n\r\nabcdef",
+            body.len()
+        );
+        parser.add_data(request_str.as_bytes()).unwrap();
+        let request = parser.parse().unwrap().unwrap();
+        assert_eq!(request.body, body);
     }
 }
