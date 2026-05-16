@@ -28,6 +28,10 @@ pub struct RequestParser {
     header_lines: Vec<String>,
     max_body_size: usize,
     current_body_size: usize,
+    /// Accumulator for chunked body data; persists across parse() calls so that
+    /// chunks already drained from `buffer` are not lost when we return
+    /// `Ok(false)` waiting for the next CRLF/chunk to arrive.
+    chunked_body: Vec<u8>,
 }
 
 impl RequestParser {
@@ -46,6 +50,7 @@ impl RequestParser {
             header_lines: Vec::new(),
             max_body_size,
             current_body_size: 0,
+            chunked_body: Vec::new(),
         }
     }
 
@@ -313,10 +318,13 @@ impl RequestParser {
         Ok(false) // Need more data
     }
 
-    /// Parse chunked body
+    /// Parse chunked body.
+    ///
+    /// Chunks already extracted from `self.buffer` are appended to
+    /// `self.chunked_body`, which persists across calls. This means we can
+    /// safely return `Ok(false)` to wait for more data without losing any
+    /// chunk we have already consumed from the network buffer.
     fn parse_chunked_body(&mut self) -> Result<bool> {
-        let mut body = Vec::new();
-
         loop {
             // Parse chunk size line
             if let Some(crlf_pos) = self.buffer.find(CRLF_BYTES) {
@@ -342,7 +350,8 @@ impl RequestParser {
                     // Final check for max body size
                     self.check_current_body_size(current_size)?;
 
-                    // Now we can safely borrow request mutably
+                    // Move accumulated body into the request
+                    let body = std::mem::take(&mut self.chunked_body);
                     if let Some(ref mut request) = self.request {
                         request.body = body;
                     }
@@ -352,15 +361,20 @@ impl RequestParser {
                 // Check if adding this chunk would exceed max body size
                 self.check_would_exceed_limit(current_size, chunk_size)?;
 
-                // Read chunk data
+                // Read chunk data: require both chunk bytes AND trailing CRLF
                 if self.buffer.len() >= chunk_size + CRLF_BYTES.len() {
                     let chunk_data = self.buffer.drain(chunk_size);
                     self.current_body_size += chunk_data.len();
-                    body.extend_from_slice(&chunk_data);
+                    self.chunked_body.extend_from_slice(&chunk_data);
                     // Skip CRLF after chunk
                     self.buffer.drain(CRLF_BYTES.len());
                 } else {
-                    // Need more data - restore what we drained
+                    // Not enough bytes for this chunk yet. We have already
+                    // consumed the chunk-size line above; the chunk payload
+                    // (so far) still sits in `self.buffer` and will be
+                    // re-examined on the next parse() call once more data
+                    // arrives. Anything we have appended to `self.chunked_body`
+                    // is retained for the next call.
                     return Ok(false);
                 }
             } else {
@@ -377,6 +391,7 @@ impl RequestParser {
         self.expected_body_size = None;
         self.header_lines.clear();
         self.current_body_size = 0;
+        self.chunked_body.clear();
     }
 
     /// Check if parser is in error state
