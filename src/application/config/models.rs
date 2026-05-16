@@ -63,7 +63,7 @@ pub struct ServerConfig {
 }
 
 /// Route configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct RouteConfig {
     /// Allowed HTTP methods
     #[serde(default)]
@@ -131,22 +131,6 @@ impl Default for Config {
             client_max_body_size: default_max_body_size(),
             servers: Vec::new(),
             admin: None,
-        }
-    }
-}
-
-impl Default for RouteConfig {
-    fn default() -> Self {
-        Self {
-            methods: Vec::new(),
-            filename: None,
-            directory: None,
-            default_file: None,
-            directory_listing: false,
-            upload_dir: None,
-            redirect: None,
-            redirect_type: None,
-            cgi_extension: None,
         }
     }
 }

@@ -26,9 +26,9 @@ impl RequestHandler for RedirectionHandler {
         // Validate route and method - this will match the route again
         let (route, error_response) = self.router.validate_request(request)?;
         if let Some(response) = error_response {
-            crate::common::logger::Logger::warn(&format!(
-                "RedirectionHandler: validate_request returned error response"
-            ));
+            crate::common::logger::Logger::warn(
+                "RedirectionHandler: validate_request returned error response",
+            );
             return Ok(response);
         }
 

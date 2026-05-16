@@ -48,7 +48,7 @@ impl Poller {
             let kev = KeventStruct {
                 ident: fd as usize,
                 filter: filter as i16,
-                flags: (EV_ADD | EV_ENABLE) as u16,
+                flags: EV_ADD | EV_ENABLE,
                 fflags: 0,
                 data: 0,
                 udata: user_data as *mut c_void,
@@ -77,7 +77,7 @@ impl Poller {
             let kev = KeventStruct {
                 ident: fd as usize,
                 filter: filter as i16,
-                flags: EV_DELETE as u16,
+                flags: EV_DELETE,
                 fflags: 0,
                 data: 0,
                 udata: std::ptr::null_mut(),

@@ -6,7 +6,7 @@ use crate::common::constants::DEFAULT_REQUEST_TIMEOUT_SECS;
 use crate::common::error::{Result, ServerError};
 use crate::http::request::Request;
 use crate::http::response::Response;
-use std::path::PathBuf;
+use std::path::Path;
 
 /// Handler for executing CGI scripts
 pub struct CgiHandler {
@@ -29,7 +29,7 @@ impl CgiHandler {
     }
 
     /// Determine interpreter for script based on extension
-    fn get_interpreter(&self, script_path: &PathBuf) -> Option<&String> {
+    fn get_interpreter(&self, script_path: &Path) -> Option<&String> {
         if let Some(ext) = script_path.extension().and_then(|e| e.to_str()) {
             self.server_config.cgi_handlers.get(ext)
         } else {
@@ -41,7 +41,7 @@ impl CgiHandler {
     fn is_cgi_script(
         &self,
         route: &crate::application::config::models::RouteConfig,
-        file_path: &PathBuf,
+        file_path: &Path,
     ) -> bool {
         // Check if route has CGI extension configured
         if let Some(ref cgi_ext) = route.cgi_extension {

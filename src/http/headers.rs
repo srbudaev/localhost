@@ -40,10 +40,7 @@ impl Headers {
 
     /// Add header value (appends to existing)
     pub fn add(&mut self, name: String, value: String) {
-        self.headers
-            .entry(name)
-            .or_insert_with(Vec::new)
-            .push(value);
+        self.headers.entry(name).or_default().push(value);
     }
 
     /// Remove header (case-insensitive)
@@ -101,25 +98,23 @@ impl Headers {
 
         Ok(headers)
     }
-
-    /// Serialize headers to HTTP format
-    pub fn to_string(&self) -> String {
-        let mut result = String::new();
-        for (name, values) in &self.headers {
-            for value in values {
-                result.push_str(name);
-                result.push_str(": ");
-                result.push_str(value);
-                result.push_str("\r\n");
-            }
-        }
-        result
-    }
 }
 
 impl Default for Headers {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for Headers {
+    /// Serialize headers to HTTP format.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (name, values) in &self.headers {
+            for value in values {
+                write!(f, "{}: {}\r\n", name, value)?;
+            }
+        }
+        Ok(())
     }
 }
 

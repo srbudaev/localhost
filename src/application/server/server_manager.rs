@@ -87,26 +87,24 @@ impl ServerManager {
                     let new_server_name = instance.server_name().to_string();
 
                     for port in instance.ports() {
-                        if !default_servers.contains_key(&port) {
-                            default_servers.insert(port, current_server_idx);
-                        } else {
-                            // Warn about multiple servers on same port
-                            // Note: We can't access server_instances here due to borrow checker,
-                            // so we'll log this after pushing the instance
-                            let existing_idx = default_servers[&port];
-                            // Store the existing server name for later warning
-                            let existing_server_name =
-                                server_instances[existing_idx].server_name().to_string();
-                            crate::common::logger::Logger::warn(&format!(
-                                "Multiple servers configured for port {}: '{}' (default) and '{}'. \
-                                Server selection will use Host header matching, falling back to '{}' if no match.",
-                                port,
-                                existing_server_name,
-                                new_server_name,
-                                existing_server_name
-                            ));
+                        match default_servers.entry(port) {
+                            std::collections::hash_map::Entry::Vacant(e) => {
+                                e.insert(current_server_idx);
+                            }
+                            std::collections::hash_map::Entry::Occupied(e) => {
+                                let existing_idx = *e.get();
+                                let existing_server_name =
+                                    server_instances[existing_idx].server_name().to_string();
+                                crate::common::logger::Logger::warn(&format!(
+                                    "Multiple servers configured for port {}: '{}' (default) and '{}'. \
+                                    Server selection will use Host header matching, falling back to '{}' if no match.",
+                                    port,
+                                    existing_server_name,
+                                    new_server_name,
+                                    existing_server_name
+                                ));
+                            }
                         }
-                        // Build server lookup: (port, hostname) -> server index
                         let hostname = instance.server_name().to_lowercase();
                         server_lookup.insert((port, hostname), current_server_idx);
                     }
@@ -466,7 +464,7 @@ impl ServerManager {
     fn handle_client_event(&mut self, fd: i32, _event: &Kevent) -> Result<()> {
         // Get connection state first to avoid borrow issues
         let state = match self.get_connection(fd) {
-            Ok(connection) => connection.state().clone(),
+            Ok(connection) => *connection.state(),
             Err(_) => {
                 // Connection not found - already closed, ignore
                 return Ok(());
@@ -507,10 +505,11 @@ impl ServerManager {
     fn handle_read(&mut self, fd: i32) -> Result<()> {
         // Read data from socket
         let mut buf = vec![0u8; DEFAULT_BUFFER_SIZE];
-        let n = match {
+        let read_result = {
             let connection = self.get_connection_mut(fd)?;
             read_non_blocking(connection.socket_mut(), &mut buf)
-        } {
+        };
+        let n = match read_result {
             Ok(n) => n,
             Err(e) => {
                 // I/O error occurred - close connection
@@ -578,9 +577,9 @@ impl ServerManager {
         let port = self.get_connection_port(fd)?;
 
         // Log EVERY request at the very start
-        crate::common::logger::Logger::info(&format!(
+        crate::common::logger::Logger::info(
             "═══════════════════════════════════════════════════════════",
-        ));
+        );
         crate::common::logger::Logger::info(&format!(
             "📥 NEW REQUEST: {} {} on port {}",
             request.method,
@@ -655,8 +654,7 @@ impl ServerManager {
             }
 
             // Check for redirect first (highest priority)
-            if route.redirect.is_some() {
-                let redirect_value = route.redirect.as_ref().unwrap();
+            if let Some(redirect_value) = &route.redirect {
                 crate::common::logger::Logger::info(&format!(
                     "→ Redirect detected! Route '{}' has redirect='{}', creating RedirectionHandler",
                     matched_path,
@@ -793,7 +791,7 @@ impl ServerManager {
         static mut CLEANUP_COUNTER: u64 = 0;
         unsafe {
             CLEANUP_COUNTER += 1;
-            if CLEANUP_COUNTER % 100 == 0 {
+            if CLEANUP_COUNTER.is_multiple_of(100) {
                 self.session_manager.cleanup_expired();
             }
         }
@@ -1005,11 +1003,12 @@ impl ServerManager {
         }
 
         // Write data
-        let n = match {
+        let write_result = {
             let connection = self.get_connection_mut(fd)?;
             let socket = connection.socket_mut();
             write_non_blocking(socket, &data)
-        } {
+        };
+        let n = match write_result {
             Ok(n) => n,
             Err(e) => {
                 // I/O error occurred - close connection

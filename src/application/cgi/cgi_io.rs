@@ -107,7 +107,7 @@ impl CgiIo {
 
     /// Parse Status header (format: "200 OK" or just "200")
     fn parse_status_header(status_str: &str) -> Result<StatusCode> {
-        let parts: Vec<&str> = status_str.trim().split_whitespace().collect();
+        let parts: Vec<&str> = status_str.split_whitespace().collect();
         if parts.is_empty() {
             return Err(ServerError::CgiError("Empty Status header".to_string()));
         }

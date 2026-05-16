@@ -2,8 +2,9 @@ use std::fmt;
 use std::str::FromStr;
 
 /// HTTP version - only HTTP/1.1 is supported
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Version {
+    #[default]
     Http11, // HTTP/1.1
 }
 
@@ -26,12 +27,6 @@ impl Version {
     /// Check if version supports chunked encoding
     pub fn supports_chunked(&self) -> bool {
         true
-    }
-}
-
-impl Default for Version {
-    fn default() -> Self {
-        Version::Http11
     }
 }
 

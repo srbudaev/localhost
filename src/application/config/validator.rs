@@ -53,10 +53,7 @@ fn validate_port_conflicts(config: &Config) -> Result<()> {
 
     for (idx, server) in config.servers.iter().enumerate() {
         for port in &server.ports {
-            port_to_servers
-                .entry(*port)
-                .or_insert_with(Vec::new)
-                .push(idx);
+            port_to_servers.entry(*port).or_default().push(idx);
         }
     }
 

@@ -27,9 +27,7 @@ impl Router {
         } else if path == "." {
             // "." means root directory
             self.root_path.clone()
-        } else if path.starts_with("./") {
-            // Remove "./" prefix and resolve relative to root_path
-            let relative = &path[2..];
+        } else if let Some(relative) = path.strip_prefix("./") {
             self.root_path.join(relative)
         } else {
             self.root_path.join(path)
@@ -240,10 +238,11 @@ mod tests {
     }
 
     fn route_with(methods: &[&str], directory: Option<&str>) -> RouteConfig {
-        let mut r = RouteConfig::default();
-        r.methods = methods.iter().map(|s| s.to_string()).collect();
-        r.directory = directory.map(|s| s.to_string());
-        r
+        RouteConfig {
+            methods: methods.iter().map(|s| s.to_string()).collect(),
+            directory: directory.map(|s| s.to_string()),
+            ..Default::default()
+        }
     }
 
     fn create_test_config() -> (ServerConfig, PathBuf) {
@@ -393,8 +392,10 @@ mod tests {
     #[test]
     fn test_method_check_is_case_insensitive() {
         // Methods are persisted as strings in config, audit may compare e.g. "get".
-        let mut route = RouteConfig::default();
-        route.methods = vec!["get".to_string()];
+        let route = RouteConfig {
+            methods: vec!["get".to_string()],
+            ..Default::default()
+        };
         let router = Router::new(&empty_server(), std::env::current_dir().unwrap());
         assert!(router.is_method_allowed(&req(Method::GET, "/x"), &route));
     }

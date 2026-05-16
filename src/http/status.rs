@@ -7,7 +7,7 @@ pub struct StatusCode(u16);
 impl StatusCode {
     /// Create a new status code
     pub fn new(code: u16) -> Option<Self> {
-        if code >= 100 && code <= 599 {
+        if (100..=599).contains(&code) {
             Some(StatusCode(code))
         } else {
             None

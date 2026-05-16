@@ -77,7 +77,7 @@ impl DirectoryListingHandler {
             html.push_str("\">");
             html.push_str(&name_str);
             if is_dir {
-                html.push_str("/");
+                html.push('/');
             }
             html.push_str("</a>");
 
@@ -86,19 +86,16 @@ impl DirectoryListingHandler {
             let padding = 50usize.saturating_sub(name_len);
             html.push_str(&" ".repeat(padding));
 
-            // Add file size or directory indicator
             if is_dir {
-                html.push_str("-");
+                html.push('-');
+            } else if let Ok(metadata) = path.metadata() {
+                let size = metadata.len();
+                html.push_str(&size.to_string());
             } else {
-                if let Ok(metadata) = path.metadata() {
-                    let size = metadata.len();
-                    html.push_str(&format!("{}", size));
-                } else {
-                    html.push_str("-");
-                }
+                html.push('-');
             }
 
-            html.push_str("\n");
+            html.push('\n');
         }
 
         html.push_str("</pre><hr></body></html>");
