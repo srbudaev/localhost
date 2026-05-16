@@ -7,7 +7,12 @@ pub struct CgiEnvironment;
 
 impl CgiEnvironment {
     /// Build environment variables for CGI script execution
-    pub fn build(request: &Request, script_path: &PathBuf, server_name: &str, server_port: u16) -> HashMap<String, String> {
+    pub fn build(
+        request: &Request,
+        script_path: &PathBuf,
+        server_name: &str,
+        server_port: u16,
+    ) -> HashMap<String, String> {
         let mut env_vars = HashMap::new();
 
         // Request method
@@ -15,10 +20,13 @@ impl CgiEnvironment {
 
         // Request URI
         env_vars.insert("REQUEST_URI".to_string(), request.target.clone());
-        
+
         // Script name (path portion of URI)
         if let Some(query_pos) = request.target.find('?') {
-            env_vars.insert("SCRIPT_NAME".to_string(), request.target[..query_pos].to_string());
+            env_vars.insert(
+                "SCRIPT_NAME".to_string(),
+                request.target[..query_pos].to_string(),
+            );
         } else {
             env_vars.insert("SCRIPT_NAME".to_string(), request.target.clone());
         }
@@ -38,7 +46,10 @@ impl CgiEnvironment {
         // Server information
         env_vars.insert("SERVER_NAME".to_string(), server_name.to_string());
         env_vars.insert("SERVER_PORT".to_string(), server_port.to_string());
-        env_vars.insert("SERVER_PROTOCOL".to_string(), format!("{}", request.version));
+        env_vars.insert(
+            "SERVER_PROTOCOL".to_string(),
+            format!("{}", request.version),
+        );
         env_vars.insert("SERVER_SOFTWARE".to_string(), "localhost/0.1.0".to_string());
 
         // Content information
@@ -90,7 +101,10 @@ impl CgiEnvironment {
 
         // Script filename (absolute path)
         if let Ok(absolute_path) = std::fs::canonicalize(script_path) {
-            env_vars.insert("SCRIPT_FILENAME".to_string(), absolute_path.to_string_lossy().to_string());
+            env_vars.insert(
+                "SCRIPT_FILENAME".to_string(),
+                absolute_path.to_string_lossy().to_string(),
+            );
         }
 
         // Document root (can be enhanced)
@@ -113,13 +127,18 @@ mod tests {
             "/cgi/test.py?param=value".to_string(),
             Version::Http11,
         );
-        request.headers.add("Host".to_string(), "localhost:8080".to_string());
+        request
+            .headers
+            .add("Host".to_string(), "localhost:8080".to_string());
 
         let script_path = PathBuf::from("/var/www/cgi/test.py");
         let env_vars = CgiEnvironment::build(&request, &script_path, "localhost", 8080);
 
         assert_eq!(env_vars.get("REQUEST_METHOD"), Some(&"GET".to_string()));
-        assert_eq!(env_vars.get("QUERY_STRING"), Some(&"param=value".to_string()));
+        assert_eq!(
+            env_vars.get("QUERY_STRING"),
+            Some(&"param=value".to_string())
+        );
         assert_eq!(env_vars.get("SERVER_NAME"), Some(&"localhost".to_string()));
     }
 }

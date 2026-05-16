@@ -31,13 +31,12 @@ impl ServerInstance {
     /// Used when listeners are managed at ServerManager level for shared ports
     pub fn new_without_listeners(config: ServerConfig, is_default: bool) -> Result<Self> {
         // Resolve root path to absolute
-        let root_path = std::fs::canonicalize(&config.root)
-            .map_err(|e| {
-                ServerError::ConfigError(format!(
-                    "Failed to resolve root path '{}': {}",
-                    config.root, e
-                ))
-            })?;
+        let root_path = std::fs::canonicalize(&config.root).map_err(|e| {
+            ServerError::ConfigError(format!(
+                "Failed to resolve root path '{}': {}",
+                config.root, e
+            ))
+        })?;
 
         // Verify root is a directory
         if !root_path.is_dir() {

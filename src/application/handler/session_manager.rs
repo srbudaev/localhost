@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use std::hash::{Hash, Hasher};
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Session data storage
-/// 
+///
 /// Stores arbitrary key-value pairs for session data
 pub type SessionData = HashMap<String, String>;
 
@@ -13,16 +13,16 @@ pub type SessionData = HashMap<String, String>;
 pub struct Session {
     /// Unique session ID
     pub id: String,
-    
+
     /// Session data (key-value pairs)
     pub data: SessionData,
-    
+
     /// Session creation time
     pub created_at: SystemTime,
-    
+
     /// Session last access time
     pub last_access: SystemTime,
-    
+
     /// Session expiration time
     pub expires_at: SystemTime,
 }
@@ -74,16 +74,16 @@ impl Session {
 }
 
 /// Session Manager
-/// 
+///
 /// Manages HTTP sessions with in-memory storage.
 /// Thread-safe implementation using Arc<RwLock> for concurrent access.
 pub struct SessionManager {
     /// Session storage: session_id -> Session
     sessions: Arc<RwLock<HashMap<String, Session>>>,
-    
+
     /// Session timeout in seconds
     timeout_secs: u64,
-    
+
     /// Cookie name for session ID (default: "session_id")
     cookie_name: String,
 }
@@ -110,18 +110,18 @@ impl SessionManager {
     /// Generate a unique session ID
     fn generate_session_id() -> String {
         use std::collections::hash_map::DefaultHasher;
-        
+
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        
+
         // Generate random component
         let mut hasher = DefaultHasher::new();
         timestamp.hash(&mut hasher);
         let random: u64 = std::ptr::addr_of!(hasher) as usize as u64;
         random.hash(&mut hasher);
-        
+
         let hash = hasher.finish();
         format!("{:x}_{:x}", timestamp, hash)
     }
@@ -130,15 +130,15 @@ impl SessionManager {
     pub fn create_session(&self) -> String {
         let session_id = Self::generate_session_id();
         let session = Session::new(session_id.clone(), self.timeout_secs);
-        
+
         let mut sessions = self.sessions.write().unwrap();
         sessions.insert(session_id.clone(), session);
-        
+
         session_id
     }
 
     /// Get or create a session from request cookie
-    /// 
+    ///
     /// If session ID exists in cookies and session is valid, returns existing session.
     /// Otherwise creates a new session.
     pub fn get_or_create_session(&self, session_id: Option<&str>) -> Option<String> {
@@ -155,7 +155,7 @@ impl SessionManager {
                 }
             }
         }
-        
+
         // Create new session
         Some(self.create_session())
     }
@@ -163,32 +163,37 @@ impl SessionManager {
     /// Get session by ID (returns a clone of session data)
     pub fn get_session(&self, session_id: &str) -> Option<Session> {
         let mut sessions = self.sessions.write().unwrap();
-        
+
         if let Some(session) = sessions.get_mut(session_id) {
             if session.is_expired() {
                 // Remove expired session
                 sessions.remove(session_id);
                 return None;
             }
-            
+
             // Touch session and return clone
             session.touch(self.timeout_secs);
             return Some(session.clone());
         }
-        
+
         None
     }
 
     /// Update session data
-    pub fn update_session(&self, session_id: &str, key: String, value: String) -> Result<(), String> {
+    pub fn update_session(
+        &self,
+        session_id: &str,
+        key: String,
+        value: String,
+    ) -> Result<(), String> {
         let mut sessions = self.sessions.write().unwrap();
-        
+
         if let Some(session) = sessions.get_mut(session_id) {
             if session.is_expired() {
                 sessions.remove(session_id);
                 return Err("Session expired".to_string());
             }
-            
+
             session.touch(self.timeout_secs);
             session.set(key, value);
             Ok(())
@@ -198,15 +203,19 @@ impl SessionManager {
     }
 
     /// Remove a value from session
-    pub fn remove_from_session(&self, session_id: &str, key: &str) -> Result<Option<String>, String> {
+    pub fn remove_from_session(
+        &self,
+        session_id: &str,
+        key: &str,
+    ) -> Result<Option<String>, String> {
         let mut sessions = self.sessions.write().unwrap();
-        
+
         if let Some(session) = sessions.get_mut(session_id) {
             if session.is_expired() {
                 sessions.remove(session_id);
                 return Err("Session expired".to_string());
             }
-            
+
             session.touch(self.timeout_secs);
             Ok(session.remove(key))
         } else {
@@ -236,9 +245,9 @@ impl SessionManager {
     pub fn cleanup_expired(&self) -> usize {
         let mut sessions = self.sessions.write().unwrap();
         let initial_count = sessions.len();
-        
+
         sessions.retain(|_, session| !session.is_expired());
-        
+
         initial_count - sessions.len()
     }
 
@@ -261,9 +270,9 @@ mod tests {
     fn test_session_creation() {
         let manager = SessionManager::new(3600);
         let session_id = manager.create_session();
-        
+
         assert!(!session_id.is_empty());
-        
+
         let session = manager.get_session(&session_id);
         assert!(session.is_some());
         assert!(!session.unwrap().is_expired());
@@ -273,9 +282,11 @@ mod tests {
     fn test_session_data() {
         let manager = SessionManager::new(3600);
         let session_id = manager.create_session();
-        
-        manager.update_session(&session_id, "user".to_string(), "john".to_string()).unwrap();
-        
+
+        manager
+            .update_session(&session_id, "user".to_string(), "john".to_string())
+            .unwrap();
+
         let session = manager.get_session(&session_id).unwrap();
         assert_eq!(session.get("user"), Some(&"john".to_string()));
     }
@@ -284,16 +295,16 @@ mod tests {
     fn test_session_expiration() {
         let manager = SessionManager::new(1); // 1 second timeout
         let session_id = manager.create_session();
-        
+
         // Session should exist
         assert!(manager.get_session(&session_id).is_some());
-        
+
         // Wait for expiration (simplified test - in real scenario use mock time)
         std::thread::sleep(Duration::from_secs(2));
-        
+
         // Cleanup expired sessions
         manager.cleanup_expired();
-        
+
         // Session should be removed
         assert!(manager.get_session(&session_id).is_none());
     }
@@ -301,11 +312,11 @@ mod tests {
     #[test]
     fn test_get_or_create_session() {
         let manager = SessionManager::new(3600);
-        
+
         // Create new session
         let session_id1 = manager.get_or_create_session(None).unwrap();
         assert!(!session_id1.is_empty());
-        
+
         // Get existing session
         let session_id2 = manager.get_or_create_session(Some(&session_id1)).unwrap();
         assert_eq!(session_id1, session_id2);

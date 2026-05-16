@@ -18,14 +18,22 @@ pub enum Method {
 impl Method {
     /// Check if method is safe (doesn't modify server state)
     pub fn is_safe(&self) -> bool {
-        matches!(self, Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE)
+        matches!(
+            self,
+            Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
+        )
     }
 
     /// Check if method is idempotent (can be safely repeated)
     pub fn is_idempotent(&self) -> bool {
         matches!(
             self,
-            Method::GET | Method::HEAD | Method::PUT | Method::DELETE | Method::OPTIONS | Method::TRACE
+            Method::GET
+                | Method::HEAD
+                | Method::PUT
+                | Method::DELETE
+                | Method::OPTIONS
+                | Method::TRACE
         )
     }
 

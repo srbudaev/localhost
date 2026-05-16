@@ -3,7 +3,9 @@ use libc::{c_int, c_void};
 use std::os::unix::io::RawFd;
 
 #[cfg(target_os = "macos")]
-use libc::{kevent, kqueue, kevent as KeventStruct, EV_ADD, EV_DELETE, EV_ENABLE, EVFILT_READ, EVFILT_WRITE};
+use libc::{
+    kevent, kevent as KeventStruct, kqueue, EVFILT_READ, EVFILT_WRITE, EV_ADD, EV_DELETE, EV_ENABLE,
+};
 
 pub use libc::kevent as Kevent;
 
@@ -46,7 +48,7 @@ impl Poller {
             let kev = KeventStruct {
                 ident: fd as usize,
                 filter: filter as i16,
-                flags: (EV_ADD | EV_ENABLE) as u16,
+                flags: EV_ADD | EV_ENABLE,
                 fflags: 0,
                 data: 0,
                 udata: user_data as *mut c_void,
@@ -75,7 +77,7 @@ impl Poller {
             let kev = KeventStruct {
                 ident: fd as usize,
                 filter: filter as i16,
-                flags: EV_DELETE as u16,
+                flags: EV_DELETE,
                 fflags: 0,
                 data: 0,
                 udata: std::ptr::null_mut(),

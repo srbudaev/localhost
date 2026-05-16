@@ -1,7 +1,7 @@
-use crate::http::headers::{Headers, names as header_names};
+use crate::http::cookie::Cookie;
+use crate::http::headers::{names as header_names, Headers};
 use crate::http::status::StatusCode;
 use crate::http::version::Version;
-use crate::http::cookie::Cookie;
 use std::time::SystemTime;
 
 /// HTTP response structure
@@ -144,8 +144,10 @@ impl Response {
 
     /// Set Content-Type header
     pub fn set_content_type(&mut self, content_type: &str) {
-        self.headers
-            .set(header_names::CONTENT_TYPE.to_string(), content_type.to_string());
+        self.headers.set(
+            header_names::CONTENT_TYPE.to_string(),
+            content_type.to_string(),
+        );
     }
 
     /// Set Content-Length header
@@ -182,8 +184,10 @@ impl Response {
     /// Enable chunked encoding
     pub fn set_chunked(&mut self) {
         self.chunked = true;
-        self.headers
-            .set(header_names::TRANSFER_ENCODING.to_string(), "chunked".to_string());
+        self.headers.set(
+            header_names::TRANSFER_ENCODING.to_string(),
+            "chunked".to_string(),
+        );
         self.headers.remove(header_names::CONTENT_LENGTH);
     }
 
@@ -212,13 +216,12 @@ impl Response {
 
     /// Remove a cookie by setting it with Max-Age=0
     pub fn remove_cookie(&mut self, name: &str, path: Option<&str>) {
-        let mut cookie = Cookie::new(name.to_string(), "".to_string())
-            .set_max_age(0);
-        
+        let mut cookie = Cookie::new(name.to_string(), "".to_string()).set_max_age(0);
+
         if let Some(path) = path {
             cookie = cookie.set_path(path.to_string());
         }
-        
+
         self.add_cookie(cookie);
     }
 }
@@ -231,25 +234,28 @@ fn format_http_date(_timestamp: u64) -> String {
     // In production, this should use chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S GMT")
     // Simplified version - returns a valid HTTP date format
     use std::time::SystemTime;
-    
+
     // Get current time
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    
+
     // Simple date calculation (not accurate, but functional)
     // Proper implementation would use chrono or similar
     let days_since_epoch = now / 86400;
     let day_of_week = (days_since_epoch + 4) % 7; // Jan 1, 1970 was Thursday
     let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    
+
     // Calculate approximate date (simplified)
     let year = 1970 + (days_since_epoch / 365);
     let day = (days_since_epoch % 365) + 1;
     let month = "Jan"; // Simplified - always Jan for now
-    
-    format!("{}, {:02} {} {} 12:00:00 GMT", days[day_of_week as usize], day, month, year)
+
+    format!(
+        "{}, {:02} {} {} 12:00:00 GMT",
+        days[day_of_week as usize], day, month, year
+    )
 }
 
 #[cfg(test)]
@@ -284,6 +290,9 @@ mod tests {
     fn test_response_headers() {
         let mut resp = Response::ok(Version::Http11);
         resp.set_content_type("text/html");
-        assert_eq!(resp.headers.get("Content-Type"), Some(&"text/html".to_string()));
+        assert_eq!(
+            resp.headers.get("Content-Type"),
+            Some(&"text/html".to_string())
+        );
     }
 }

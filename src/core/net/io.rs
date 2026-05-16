@@ -17,4 +17,3 @@ pub fn write_non_blocking(socket: &mut ClientSocket, buf: &[u8]) -> Result<usize
         Err(e) => Err(ServerError::IoError(e)),
     }
 }
-

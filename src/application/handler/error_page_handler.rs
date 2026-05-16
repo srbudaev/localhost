@@ -4,7 +4,7 @@ use crate::http::response::Response;
 use crate::http::status::StatusCode;
 use crate::http::version::Version;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Handler for custom error pages
 pub struct ErrorPageHandler {
@@ -14,7 +14,7 @@ pub struct ErrorPageHandler {
 
 impl ErrorPageHandler {
     /// Resolve error page path - helper to reduce redundancy with router's resolve_path
-    fn resolve_error_path(root_path: &PathBuf, path: &str) -> PathBuf {
+    fn resolve_error_path(root_path: &Path, path: &str) -> PathBuf {
         if path.starts_with('/') || path.starts_with("./") {
             PathBuf::from(path)
         } else {
@@ -29,7 +29,10 @@ impl ErrorPageHandler {
             .iter()
             .filter_map(|(code, error_config)| {
                 // Only include error pages with filenames
-                error_config.filename.as_ref().map(|filename| (code.clone(), filename.clone()))
+                error_config
+                    .filename
+                    .as_ref()
+                    .map(|filename| (code.clone(), filename.clone()))
             })
             .collect();
 
@@ -70,7 +73,11 @@ impl ErrorPageHandler {
     }
 
     /// Create HTML response with content (helper to reduce redundancy)
-    fn create_html_response(version: Version, status_code: StatusCode, content: Vec<u8>) -> Response {
+    fn create_html_response(
+        version: Version,
+        status_code: StatusCode,
+        content: Vec<u8>,
+    ) -> Response {
         let mut response = Response::new(version, status_code);
         response.set_content_type("text/html");
         response.set_body(content);

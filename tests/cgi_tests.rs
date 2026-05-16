@@ -14,7 +14,7 @@ fn create_test_script(name: &str, content: &str) -> PathBuf {
     let script_path = PathBuf::from(format!("/tmp/{}", name));
     let mut file = fs::File::create(&script_path).unwrap();
     file.write_all(content.as_bytes()).unwrap();
-    
+
     // Make script executable
     #[cfg(unix)]
     {
@@ -23,7 +23,7 @@ fn create_test_script(name: &str, content: &str) -> PathBuf {
         perms.set_mode(0o755);
         fs::set_permissions(&script_path, perms).unwrap();
     }
-    
+
     script_path
 }
 
@@ -58,14 +58,18 @@ sys.stdout.write(f'Transfer-Encoding: none\n')
 "#;
 
     let script_path = create_test_script("test_unchunked.py", script_content);
-    
+
     // Create request with unchunked data (using Content-Length)
     let body = b"Hello from unchunked request";
     let mut request = Request::new(Method::POST, "/test".to_string(), Version::Http11);
     request.body = body.to_vec();
-    request.headers.add("Content-Length".to_string(), body.len().to_string());
-    request.headers.add("Content-Type".to_string(), "text/plain".to_string());
-    
+    request
+        .headers
+        .add("Content-Length".to_string(), body.len().to_string());
+    request
+        .headers
+        .add("Content-Type".to_string(), "text/plain".to_string());
+
     // Execute CGI
     let executor = CgiExecutor::new(30);
     let response = executor.execute(
@@ -75,18 +79,31 @@ sys.stdout.write(f'Transfer-Encoding: none\n')
         "localhost",
         8080,
     );
-    
+
     cleanup_script(&script_path);
-    
+
     // Verify response
-    assert!(response.is_ok(), "CGI execution should succeed: {:?}", response.err());
+    assert!(
+        response.is_ok(),
+        "CGI execution should succeed: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
     assert_eq!(response.status.as_u16(), 200);
-    
+
     let body_str = String::from_utf8_lossy(&response.body);
-    assert!(body_str.contains("Content-Length: 28"), "Should show correct content length");
-    assert!(body_str.contains("Hello from unchunked request"), "Should echo the data");
-    assert!(body_str.contains("Transfer-Encoding: none"), "Should indicate unchunked");
+    assert!(
+        body_str.contains("Content-Length: 28"),
+        "Should show correct content length"
+    );
+    assert!(
+        body_str.contains("Hello from unchunked request"),
+        "Should echo the data"
+    );
+    assert!(
+        body_str.contains("Transfer-Encoding: none"),
+        "Should indicate unchunked"
+    );
 }
 
 #[test]
@@ -115,15 +132,19 @@ sys.stdout.write(f'Received data: {data}\n')
 "#;
 
     let script_path = create_test_script("test_chunked.py", script_content);
-    
+
     // Create request with chunked transfer encoding
     // Note: The body should already be decoded from chunks by the HTTP parser
     let body = b"This is chunked data that has been decoded";
     let mut request = Request::new(Method::POST, "/test".to_string(), Version::Http11);
     request.body = body.to_vec();
-    request.headers.add("Transfer-Encoding".to_string(), "chunked".to_string());
-    request.headers.add("Content-Type".to_string(), "text/plain".to_string());
-    
+    request
+        .headers
+        .add("Transfer-Encoding".to_string(), "chunked".to_string());
+    request
+        .headers
+        .add("Content-Type".to_string(), "text/plain".to_string());
+
     // Execute CGI
     let executor = CgiExecutor::new(30);
     let response = executor.execute(
@@ -133,18 +154,31 @@ sys.stdout.write(f'Received data: {data}\n')
         "localhost",
         8080,
     );
-    
+
     cleanup_script(&script_path);
-    
+
     // Verify response
-    assert!(response.is_ok(), "CGI execution should succeed with chunked data: {:?}", response.err());
+    assert!(
+        response.is_ok(),
+        "CGI execution should succeed with chunked data: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
     assert_eq!(response.status.as_u16(), 200);
-    
+
     let body_str = String::from_utf8_lossy(&response.body);
-    assert!(body_str.contains("Transfer-Encoding header: chunked"), "Should detect chunked encoding");
-    assert!(body_str.contains("This is chunked data"), "Should have received the decoded data");
-    assert!(body_str.contains("Data length: 42"), "Should show correct data length");
+    assert!(
+        body_str.contains("Transfer-Encoding header: chunked"),
+        "Should detect chunked encoding"
+    );
+    assert!(
+        body_str.contains("This is chunked data"),
+        "Should have received the decoded data"
+    );
+    assert!(
+        body_str.contains("Data length: 42"),
+        "Should show correct data length"
+    );
 }
 
 #[test]
@@ -169,10 +203,14 @@ sys.stdout.write('Body: (none)\n')
 "#;
 
     let script_path = create_test_script("test_nobody.py", script_content);
-    
+
     // Create GET request with no body
-    let request = Request::new(Method::GET, "/test?param=value".to_string(), Version::Http11);
-    
+    let request = Request::new(
+        Method::GET,
+        "/test?param=value".to_string(),
+        Version::Http11,
+    );
+
     // Execute CGI
     let executor = CgiExecutor::new(30);
     let response = executor.execute(
@@ -182,17 +220,24 @@ sys.stdout.write('Body: (none)\n')
         "localhost",
         8080,
     );
-    
+
     cleanup_script(&script_path);
-    
+
     // Verify response
-    assert!(response.is_ok(), "CGI execution should succeed with no body: {:?}", response.err());
+    assert!(
+        response.is_ok(),
+        "CGI execution should succeed with no body: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
     assert_eq!(response.status.as_u16(), 200);
-    
+
     let body_str = String::from_utf8_lossy(&response.body);
     assert!(body_str.contains("Method: GET"), "Should show GET method");
-    assert!(body_str.contains("Query: param=value"), "Should show query string");
+    assert!(
+        body_str.contains("Query: param=value"),
+        "Should show query string"
+    );
     assert!(body_str.contains("Body: (none)"), "Should indicate no body");
 }
 
@@ -221,14 +266,19 @@ sys.stdout.write(f'Match: {len(data) == content_length}\n')
 "#;
 
     let script_path = create_test_script("test_large_unchunked.py", script_content);
-    
+
     // Create request with large body (10KB)
     let body = vec![b'X'; 10240];
     let mut request = Request::new(Method::POST, "/test".to_string(), Version::Http11);
     request.body = body.clone();
-    request.headers.add("Content-Length".to_string(), body.len().to_string());
-    request.headers.add("Content-Type".to_string(), "application/octet-stream".to_string());
-    
+    request
+        .headers
+        .add("Content-Length".to_string(), body.len().to_string());
+    request.headers.add(
+        "Content-Type".to_string(),
+        "application/octet-stream".to_string(),
+    );
+
     // Execute CGI
     let executor = CgiExecutor::new(30);
     let response = executor.execute(
@@ -238,17 +288,27 @@ sys.stdout.write(f'Match: {len(data) == content_length}\n')
         "localhost",
         8080,
     );
-    
+
     cleanup_script(&script_path);
-    
+
     // Verify response
-    assert!(response.is_ok(), "CGI execution should succeed with large data: {:?}", response.err());
+    assert!(
+        response.is_ok(),
+        "CGI execution should succeed with large data: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
     assert_eq!(response.status.as_u16(), 200);
-    
+
     let body_str = String::from_utf8_lossy(&response.body);
-    assert!(body_str.contains("Received bytes: 10240"), "Should receive all bytes");
-    assert!(body_str.contains("Content-Length header: 10240"), "Should have correct header");
+    assert!(
+        body_str.contains("Received bytes: 10240"),
+        "Should receive all bytes"
+    );
+    assert!(
+        body_str.contains("Content-Length header: 10240"),
+        "Should have correct header"
+    );
     assert!(body_str.contains("Match: True"), "Should match exactly");
 }
 
@@ -282,14 +342,19 @@ sys.stdout.write(f'Last 50 chars: {data[-50:]}\n')
 "#;
 
     let script_path = create_test_script("test_multi_chunk.py", script_content);
-    
+
     // Create request with data that would typically be chunked (5KB)
     let body = vec![b'A'; 5120];
     let mut request = Request::new(Method::POST, "/test".to_string(), Version::Http11);
     request.body = body.clone();
-    request.headers.add("Transfer-Encoding".to_string(), "chunked".to_string());
-    request.headers.add("Content-Type".to_string(), "application/octet-stream".to_string());
-    
+    request
+        .headers
+        .add("Transfer-Encoding".to_string(), "chunked".to_string());
+    request.headers.add(
+        "Content-Type".to_string(),
+        "application/octet-stream".to_string(),
+    );
+
     // Execute CGI
     let executor = CgiExecutor::new(30);
     let response = executor.execute(
@@ -299,17 +364,27 @@ sys.stdout.write(f'Last 50 chars: {data[-50:]}\n')
         "localhost",
         8080,
     );
-    
+
     cleanup_script(&script_path);
-    
+
     // Verify response
-    assert!(response.is_ok(), "CGI execution should succeed with multi-chunk data: {:?}", response.err());
+    assert!(
+        response.is_ok(),
+        "CGI execution should succeed with multi-chunk data: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
     assert_eq!(response.status.as_u16(), 200);
-    
+
     let body_str = String::from_utf8_lossy(&response.body);
-    assert!(body_str.contains("Total data length: 5120"), "Should receive all data");
-    assert!(body_str.contains("AAAAA"), "Should contain the expected data");
+    assert!(
+        body_str.contains("Total data length: 5120"),
+        "Should receive all data"
+    );
+    assert!(
+        body_str.contains("AAAAA"),
+        "Should contain the expected data"
+    );
 }
 
 #[test]
@@ -333,10 +408,10 @@ sys.stdout.write('This is the final part.\n')
 "#;
 
     let script_path = create_test_script("test_output_chunked.py", script_content);
-    
+
     // Create simple GET request
     let request = Request::new(Method::GET, "/test".to_string(), Version::Http11);
-    
+
     // Execute CGI
     let executor = CgiExecutor::new(30);
     let response = executor.execute(
@@ -346,23 +421,33 @@ sys.stdout.write('This is the final part.\n')
         "localhost",
         8080,
     );
-    
+
     cleanup_script(&script_path);
-    
+
     // Verify response
-    assert!(response.is_ok(), "CGI execution should succeed with chunked output: {:?}", response.err());
+    assert!(
+        response.is_ok(),
+        "CGI execution should succeed with chunked output: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
     assert_eq!(response.status.as_u16(), 200);
-    
+
     // Check that output is received
     let body_str = String::from_utf8_lossy(&response.body);
     assert!(body_str.contains("first part"), "Should contain first part");
-    assert!(body_str.contains("second part"), "Should contain second part");
+    assert!(
+        body_str.contains("second part"),
+        "Should contain second part"
+    );
     assert!(body_str.contains("final part"), "Should contain final part");
-    
+
     // Check headers
     if let Some(transfer_encoding) = response.headers.get("Transfer-Encoding") {
-        assert_eq!(transfer_encoding, "chunked", "Should have chunked transfer encoding");
+        assert_eq!(
+            transfer_encoding, "chunked",
+            "Should have chunked transfer encoding"
+        );
     }
 }
 
@@ -390,13 +475,18 @@ sys.stdout.write(f'CONTENT_TYPE: {content_type}\n')
 "#;
 
     let script_path = create_test_script("test_env_chunked.py", script_content);
-    
+
     // Create request with chunked encoding
     let mut request = Request::new(Method::POST, "/test".to_string(), Version::Http11);
     request.body = b"test data".to_vec();
-    request.headers.add("Transfer-Encoding".to_string(), "chunked".to_string());
-    request.headers.add("Content-Type".to_string(), "application/x-www-form-urlencoded".to_string());
-    
+    request
+        .headers
+        .add("Transfer-Encoding".to_string(), "chunked".to_string());
+    request.headers.add(
+        "Content-Type".to_string(),
+        "application/x-www-form-urlencoded".to_string(),
+    );
+
     // Execute CGI
     let executor = CgiExecutor::new(30);
     let response = executor.execute(
@@ -406,17 +496,27 @@ sys.stdout.write(f'CONTENT_TYPE: {content_type}\n')
         "localhost",
         8080,
     );
-    
+
     cleanup_script(&script_path);
-    
+
     // Verify response
-    assert!(response.is_ok(), "CGI execution should succeed: {:?}", response.err());
+    assert!(
+        response.is_ok(),
+        "CGI execution should succeed: {:?}",
+        response.err()
+    );
     let response = response.unwrap();
     assert_eq!(response.status.as_u16(), 200);
-    
+
     let body_str = String::from_utf8_lossy(&response.body);
-    assert!(body_str.contains("HTTP_TRANSFER_ENCODING: chunked"), "Should pass Transfer-Encoding header");
-    assert!(body_str.contains("CONTENT_TYPE: application/x-www-form-urlencoded"), "Should pass Content-Type");
+    assert!(
+        body_str.contains("HTTP_TRANSFER_ENCODING: chunked"),
+        "Should pass Transfer-Encoding header"
+    );
+    assert!(
+        body_str.contains("CONTENT_TYPE: application/x-www-form-urlencoded"),
+        "Should pass Content-Type"
+    );
 }
 
 #[test]
@@ -447,15 +547,19 @@ sys.stdout.write(f'MD5 hash: {data_hash}\n')
 "#;
 
     let script_path = create_test_script("test_comparison.py", script_content);
-    
+
     let test_data = b"The quick brown fox jumps over the lazy dog";
-    
+
     // Test 1: Unchunked
     let mut request1 = Request::new(Method::POST, "/test".to_string(), Version::Http11);
     request1.body = test_data.to_vec();
-    request1.headers.add("Content-Length".to_string(), test_data.len().to_string());
-    request1.headers.add("Content-Type".to_string(), "text/plain".to_string());
-    
+    request1
+        .headers
+        .add("Content-Length".to_string(), test_data.len().to_string());
+    request1
+        .headers
+        .add("Content-Type".to_string(), "text/plain".to_string());
+
     let executor = CgiExecutor::new(30);
     let result1 = executor.execute(
         script_path.clone(),
@@ -464,15 +568,23 @@ sys.stdout.write(f'MD5 hash: {data_hash}\n')
         "localhost",
         8080,
     );
-    assert!(result1.is_ok(), "Unchunked request should succeed: {:?}", result1.err());
+    assert!(
+        result1.is_ok(),
+        "Unchunked request should succeed: {:?}",
+        result1.err()
+    );
     let response1 = result1.unwrap();
-    
+
     // Test 2: Chunked
     let mut request2 = Request::new(Method::POST, "/test".to_string(), Version::Http11);
     request2.body = test_data.to_vec();
-    request2.headers.add("Transfer-Encoding".to_string(), "chunked".to_string());
-    request2.headers.add("Content-Type".to_string(), "text/plain".to_string());
-    
+    request2
+        .headers
+        .add("Transfer-Encoding".to_string(), "chunked".to_string());
+    request2
+        .headers
+        .add("Content-Type".to_string(), "text/plain".to_string());
+
     let result2 = executor.execute(
         script_path.clone(),
         Some("python3"),
@@ -480,36 +592,45 @@ sys.stdout.write(f'MD5 hash: {data_hash}\n')
         "localhost",
         8080,
     );
-    assert!(result2.is_ok(), "Chunked request should succeed: {:?}", result2.err());
+    assert!(
+        result2.is_ok(),
+        "Chunked request should succeed: {:?}",
+        result2.err()
+    );
     let response2 = result2.unwrap();
-    
+
     cleanup_script(&script_path);
-    
+
     // Both should succeed
     assert_eq!(response1.status.as_u16(), 200);
     assert_eq!(response2.status.as_u16(), 200);
-    
+
     let body1 = String::from_utf8_lossy(&response1.body);
     let body2 = String::from_utf8_lossy(&response2.body);
-    
+
     // Extract MD5 hashes
-    let hash1 = body1.lines()
+    let hash1 = body1
+        .lines()
         .find(|l| l.starts_with("MD5 hash:"))
         .unwrap()
         .split(": ")
         .nth(1)
         .unwrap();
-    
-    let hash2 = body2.lines()
+
+    let hash2 = body2
+        .lines()
         .find(|l| l.starts_with("MD5 hash:"))
         .unwrap()
         .split(": ")
         .nth(1)
         .unwrap();
-    
+
     // Hashes should match - data is identical regardless of chunking
-    assert_eq!(hash1, hash2, "Data should be identical for chunked and unchunked");
-    
+    assert_eq!(
+        hash1, hash2,
+        "Data should be identical for chunked and unchunked"
+    );
+
     // Both should report same data length (43 bytes)
     assert!(body1.contains("Data length: 43"));
     assert!(body2.contains("Data length: 43"));

@@ -53,4 +53,3 @@ impl Drop for FileDescriptor {
         }
     }
 }
-

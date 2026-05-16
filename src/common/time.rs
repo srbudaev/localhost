@@ -19,4 +19,3 @@ impl Timeout {
         self.deadline.saturating_duration_since(Instant::now())
     }
 }
-

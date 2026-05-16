@@ -33,6 +33,9 @@ mod tests {
 
     #[test]
     fn test_load_valid_config() {
+        // A minimal config whose root resolves to the current working directory
+        // (which always exists, both locally and on CI). The loader must parse
+        // AND validate it successfully.
         let toml = r#"
             [[servers]]
             server_address = "127.0.0.1"
@@ -41,9 +44,30 @@ mod tests {
             root = "."
         "#;
 
-        // This will fail validation because root doesn't exist, but parsing should work
         let result = ConfigLoader::load_from_str(toml);
-        // We expect validation error, not parse error
-        assert!(result.is_err());
+        assert!(
+            result.is_ok(),
+            "valid config must load cleanly, got error: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_load_rejects_nonexistent_root() {
+        // Validator must reject a config whose root directory does not exist
+        // on disk; the auditor explicitly checks for "invalid paths" handling.
+        let toml = r#"
+            [[servers]]
+            server_address = "127.0.0.1"
+            ports = [8080]
+            server_name = "localhost"
+            root = "/definitely/does/not/exist/localhost-audit-marker"
+        "#;
+
+        let result = ConfigLoader::load_from_str(toml);
+        assert!(
+            result.is_err(),
+            "nonexistent root directory must be rejected by validator"
+        );
     }
 }

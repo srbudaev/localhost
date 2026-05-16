@@ -45,9 +45,7 @@ impl DirectoryListingHandler {
         let entries = fs::read_dir(dir_path)
             .map_err(|e| ServerError::HttpError(format!("Failed to read directory: {}", e)))?;
 
-        let mut entries: Vec<_> = entries
-            .filter_map(|e| e.ok())
-            .collect();
+        let mut entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
 
         // Sort entries: directories first, then files
         entries.sort_by(|a, b| {
@@ -79,7 +77,7 @@ impl DirectoryListingHandler {
             html.push_str("\">");
             html.push_str(&name_str);
             if is_dir {
-                html.push_str("/");
+                html.push('/');
             }
             html.push_str("</a>");
 
@@ -88,19 +86,16 @@ impl DirectoryListingHandler {
             let padding = 50usize.saturating_sub(name_len);
             html.push_str(&" ".repeat(padding));
 
-            // Add file size or directory indicator
             if is_dir {
-                html.push_str("-");
+                html.push('-');
+            } else if let Ok(metadata) = path.metadata() {
+                let size = metadata.len();
+                html.push_str(&size.to_string());
             } else {
-                if let Ok(metadata) = path.metadata() {
-                    let size = metadata.len();
-                    html.push_str(&format!("{}", size));
-                } else {
-                    html.push_str("-");
-                }
+                html.push('-');
             }
 
-            html.push_str("\n");
+            html.push('\n');
         }
 
         html.push_str("</pre><hr></body></html>");
@@ -128,7 +123,7 @@ impl RequestHandler for DirectoryListingHandler {
         if !self.router.is_directory_listing_enabled(route) {
             return Ok(Response::forbidden_with_message(
                 request.version,
-                "Directory listing is disabled"
+                "Directory listing is disabled",
             ));
         }
 

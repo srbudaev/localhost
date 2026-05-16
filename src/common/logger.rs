@@ -13,9 +13,11 @@ impl Logger {
         eprintln!("[WARN] {}", msg);
     }
 
+    #[cfg(debug_assertions)]
     pub fn debug(msg: &str) {
-        #[cfg(debug_assertions)]
         println!("[DEBUG] {}", msg);
     }
-}
 
+    #[cfg(not(debug_assertions))]
+    pub fn debug(_msg: &str) {}
+}

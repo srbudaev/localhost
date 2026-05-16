@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel older runs on the same branch when a new commit lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint: format check + clippy. Fast, no build artifacts needed downstream.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (fmt + clippy)
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lint-${{ runner.os }}
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+  # ---------------------------------------------------------------------------
+  # Build: debug + release. Surfaces compilation errors early.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build (debug + release)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: build-${{ runner.os }}
+
+      - name: cargo build (debug)
+        run: cargo build --locked --verbose
+
+      - name: cargo build (release)
+        run: cargo build --release --locked --verbose
+
+  # ---------------------------------------------------------------------------
+  # Tests: unit + integration tests that are NOT marked #[ignore].
+  #
+  # Integration tests in tests/integration_tests.rs, tests/error_tests.rs and
+  # tests/stress_tests.rs are intentionally #[ignore]'d - they spawn a real
+  # server and bind to hard-coded ports, which is unsafe on shared CI runners.
+  # We surface them in the dedicated `stress.yml` workflow.
+  #
+  # The CGI tests do require python3 (macos-latest has it pre-installed).
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests (lib + integration)
+    runs-on: macos-latest
+    timeout-minutes: 25
+    needs: [lint, build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-${{ runner.os }}
+
+      - name: Verify python3 is available (needed by cgi_tests.rs)
+        run: |
+          which python3
+          python3 --version
+
+      # --lib runs unit tests embedded in src/* (#[cfg(test)] mod tests).
+      - name: cargo test --lib
+        run: cargo test --lib --locked --verbose
+
+      # Integration test files that do NOT spin up a real server -
+      # they are deterministic and safe to run on every push.
+      - name: cargo test --test config_tests
+        run: cargo test --test config_tests --locked --verbose
+
+      - name: cargo test --test cgi_tests
+        run: cargo test --test cgi_tests --locked --verbose

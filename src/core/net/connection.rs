@@ -101,4 +101,3 @@ impl Connection {
         self.socket.as_raw_fd()
     }
 }
-

@@ -1,7 +1,8 @@
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
+# Note: Cargo.lock IS committed because this is a binary application
+# (see https://doc.rust-lang.org/cargo/faq.html#why-do-binaries-have-cargolock-in-version-control-but-not-libraries)
 
 # IDE
 .idea/

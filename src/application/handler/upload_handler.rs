@@ -23,7 +23,11 @@ impl UploadHandler {
     }
 
     /// Parse multipart/form-data body to extract file content, filename, and MIME type
-    fn parse_multipart_body(&self, body: &[u8], content_type: &str) -> Result<(Vec<u8>, Option<String>, Option<String>)> {
+    fn parse_multipart_body(
+        &self,
+        body: &[u8],
+        content_type: &str,
+    ) -> Result<(Vec<u8>, Option<String>, Option<String>)> {
         // Extract boundary from Content-Type header
         // Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
         let boundary_str = content_type
@@ -32,18 +36,25 @@ impl UploadHandler {
                 let start = pos + 9; // "boundary=".len()
                 let value = &content_type[start..];
                 // Remove quotes if present and trim
-                value.trim_matches('"').trim_matches('\'').trim().to_string()
+                value
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .trim()
+                    .to_string()
             })
-            .ok_or_else(|| ServerError::HttpError("No boundary found in multipart Content-Type".to_string()))?;
-        
+            .ok_or_else(|| {
+                ServerError::HttpError("No boundary found in multipart Content-Type".to_string())
+            })?;
+
         let boundary = format!("--{}", boundary_str);
         let boundary_bytes = boundary.as_bytes();
-        
+
         // Split body by boundary to find parts
         let mut parts = Vec::new();
         let mut start = 0;
-        
-        while let Some(boundary_pos) = body[start..].windows(boundary_bytes.len())
+
+        while let Some(boundary_pos) = body[start..]
+            .windows(boundary_bytes.len())
             .position(|window| window == boundary_bytes)
             .map(|pos| start + pos)
         {
@@ -51,7 +62,7 @@ impl UploadHandler {
                 parts.push(&body[start..boundary_pos]);
             }
             start = boundary_pos + boundary_bytes.len();
-            
+
             // Skip CRLF after boundary
             if start < body.len() && body[start] == b'\r' {
                 start += 1;
@@ -60,38 +71,45 @@ impl UploadHandler {
                 start += 1;
             }
         }
-        
+
         // Process each part to find file content
         for part in parts {
             // Find Content-Disposition header
-            if let Some(disposition_pos) = part.windows(b"Content-Disposition:".len())
+            if let Some(disposition_pos) = part
+                .windows(b"Content-Disposition:".len())
                 .position(|window| window == b"Content-Disposition:")
             {
                 let disposition_section = &part[disposition_pos..];
-                
+
                 // Extract filename from Content-Disposition
-                let filename = if let Some(filename_pos) = disposition_section.windows(b"filename=".len())
+                let filename = if let Some(filename_pos) = disposition_section
+                    .windows(b"filename=".len())
                     .position(|window| window == b"filename=")
                 {
                     let filename_start = filename_pos + 9; // "filename=".len()
                     let filename_section = &disposition_section[filename_start..];
-                    
+
                     // Find the filename value (between quotes or until semicolon/newline)
                     let mut filename_end = filename_section.len();
                     for (i, &byte) in filename_section.iter().enumerate() {
-                        if byte == b'"' || byte == b'\'' || byte == b';' || byte == b'\r' || byte == b'\n' {
+                        if byte == b'"'
+                            || byte == b'\''
+                            || byte == b';'
+                            || byte == b'\r'
+                            || byte == b'\n'
+                        {
                             filename_end = i;
                             break;
                         }
                     }
-                    
+
                     let filename_bytes = &filename_section[..filename_end];
                     let filename_str = String::from_utf8_lossy(filename_bytes)
                         .trim_matches('"')
                         .trim_matches('\'')
                         .trim()
                         .to_string();
-                    
+
                     if !filename_str.is_empty() {
                         Some(filename_str)
                     } else {
@@ -100,13 +118,14 @@ impl UploadHandler {
                 } else {
                     None
                 };
-                
+
                 // Extract Content-Type (MIME type) from this part
-                let mime_type = if let Some(content_type_pos) = part.windows(b"Content-Type:".len())
+                let mime_type = if let Some(content_type_pos) = part
+                    .windows(b"Content-Type:".len())
                     .position(|window| window == b"Content-Type:")
                 {
                     let content_type_section = &part[content_type_pos + 13..]; // Skip "Content-Type:"
-                    // Find the end of Content-Type value (until \r or \n)
+                                                                               // Find the end of Content-Type value (until \r or \n)
                     let mut mime_end = content_type_section.len();
                     for (i, &byte) in content_type_section.iter().enumerate() {
                         if byte == b'\r' || byte == b'\n' {
@@ -124,27 +143,28 @@ impl UploadHandler {
                 } else {
                     None
                 };
-                
+
                 // Find content start (after \r\n\r\n)
-                if let Some(content_sep_pos) = part.windows(b"\r\n\r\n".len())
+                if let Some(content_sep_pos) = part
+                    .windows(b"\r\n\r\n".len())
                     .position(|window| window == b"\r\n\r\n")
                 {
                     let content_start = content_sep_pos + 4; // Skip \r\n\r\n
                     let mut content_end = part.len();
-                    
+
                     // Remove trailing CRLF before next boundary
                     if content_end >= 2 && part[content_end - 2..] == b"\r\n"[..] {
                         content_end -= 2;
                     } else if content_end >= 1 && part[content_end - 1] == b'\n' {
                         content_end -= 1;
                     }
-                    
+
                     let content = part[content_start..content_end].to_vec();
                     return Ok((content, filename, mime_type));
                 }
             }
         }
-        
+
         // If no file part found, return the whole body
         Ok((body.to_vec(), None, None))
     }
@@ -173,7 +193,8 @@ impl UploadHandler {
                     "mp4" => "video/mp4",
                     "mp3" => "audio/mpeg",
                     _ => "application/octet-stream",
-                }.to_string()
+                }
+                .to_string()
             })
     }
 
@@ -181,7 +202,7 @@ impl UploadHandler {
     fn get_extension_from_mime_type(&self, mime_type: &str) -> Option<String> {
         // Normalize MIME type (remove parameters like charset)
         let mime = mime_type.split(';').next().unwrap_or(mime_type).trim();
-        
+
         match mime {
             "text/html" => Some("html".to_string()),
             "text/css" => Some("css".to_string()),
@@ -207,7 +228,7 @@ impl UploadHandler {
     fn is_valid_mime_type(&self, mime_type: &str) -> bool {
         // Normalize MIME type (remove parameters like charset)
         let mime = mime_type.split(';').next().unwrap_or(mime_type).trim();
-        
+
         // Whitelist of allowed MIME types
         let allowed_types = [
             // Text types
@@ -236,7 +257,7 @@ impl UploadHandler {
             "audio/mpeg",
             "audio/mp3",
         ];
-        
+
         allowed_types.contains(&mime)
     }
 
@@ -246,24 +267,28 @@ impl UploadHandler {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        
+
         // Use timestamp + hash of content for uniqueness
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         content.hash(&mut hasher);
         let hash = hasher.finish();
-        
+
         format!("upload_{}_{:x}", timestamp, hash & 0xFFFF)
     }
 
     /// Save uploaded file and optionally store MIME type metadata
     /// Ensures the file extension matches the MIME type
-    fn save_file(&self, content: &[u8], original_filename: Option<&str>, mime_type: Option<&str>) -> Result<PathBuf> {
+    fn save_file(
+        &self,
+        content: &[u8],
+        original_filename: Option<&str>,
+        mime_type: Option<&str>,
+    ) -> Result<PathBuf> {
         // Ensure upload directory exists
         if !self.upload_dir.exists() {
-            fs::create_dir_all(&self.upload_dir)
-                .map_err(|e| ServerError::HttpError(format!(
-                    "Failed to create upload directory: {}", e
-                )))?;
+            fs::create_dir_all(&self.upload_dir).map_err(|e| {
+                ServerError::HttpError(format!("Failed to create upload directory: {}", e))
+            })?;
         }
 
         // Determine the correct file extension based on MIME type
@@ -276,27 +301,25 @@ impl UploadHandler {
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or(orig_name);
-            
+
             // Get the base name and current extension
             let base_name = Path::new(sanitized)
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or(sanitized);
-            
-            let current_ext = Path::new(sanitized)
-                .extension()
-                .and_then(|e| e.to_str());
-            
+
+            let current_ext = Path::new(sanitized).extension().and_then(|e| e.to_str());
+
             // Use correct extension from MIME type if available, otherwise use original extension
             let final_ext = correct_extension.as_deref().or(current_ext);
-            
+
             // Build final filename with correct extension
             let mut final_name = if let Some(ext) = final_ext {
                 format!("{}.{}", base_name, ext)
             } else {
                 base_name.to_string()
             };
-            
+
             // Check if file already exists, append number if needed
             let mut counter = 1;
             while self.upload_dir.join(&final_name).exists() {
@@ -322,9 +345,7 @@ impl UploadHandler {
 
         // Write file
         fs::write(&file_path, content)
-            .map_err(|e| ServerError::HttpError(format!(
-                "Failed to write uploaded file: {}", e
-            )))?;
+            .map_err(|e| ServerError::HttpError(format!("Failed to write uploaded file: {}", e)))?;
 
         Ok(file_path)
     }
@@ -336,7 +357,7 @@ impl RequestHandler for UploadHandler {
         if request.method != Method::POST {
             return Ok(Response::method_not_allowed_with_message(
                 request.version,
-                "Only POST method is allowed for file uploads"
+                "Only POST method is allowed for file uploads",
             ));
         }
 
@@ -350,7 +371,7 @@ impl RequestHandler for UploadHandler {
         if route.upload_dir.is_none() {
             return Ok(Response::bad_request_with_message(
                 request.version,
-                "Upload directory not configured for this route"
+                "Upload directory not configured for this route",
             ));
         }
 
@@ -358,29 +379,33 @@ impl RequestHandler for UploadHandler {
         if request.body.is_empty() {
             return Ok(Response::bad_request_with_message(
                 request.version,
-                "No file data provided"
+                "No file data provided",
             ));
         }
 
         // Parse multipart/form-data if Content-Type indicates it
-        let (file_content, filename, mime_type) = if let Some(content_type) = request.content_type() {
+        let (file_content, filename, mime_type) = if let Some(content_type) = request.content_type()
+        {
             if content_type.starts_with("multipart/form-data") {
                 // Parse multipart body to extract file content, filename, and MIME type
                 self.parse_multipart_body(&request.body, content_type)?
             } else {
                 // Not multipart - use body as-is and try to get filename from Content-Disposition header
-                let filename = request.headers
+                let filename = request
+                    .headers
                     .get("Content-Disposition")
                     .and_then(|header| {
-                        header
-                            .find("filename=")
-                            .map(|pos| {
-                                let start = pos + 9; // "filename=".len()
-                                let value = &header[start..];
-                                // Remove quotes and any trailing content
-                                let value = value.split(';').next().unwrap_or(value);
-                                value.trim_matches('"').trim_matches('\'').trim().to_string()
-                            })
+                        header.find("filename=").map(|pos| {
+                            let start = pos + 9; // "filename=".len()
+                            let value = &header[start..];
+                            // Remove quotes and any trailing content
+                            let value = value.split(';').next().unwrap_or(value);
+                            value
+                                .trim_matches('"')
+                                .trim_matches('\'')
+                                .trim()
+                                .to_string()
+                        })
                     });
                 // Get MIME type from Content-Type header if not multipart
                 let mime = if content_type != "multipart/form-data" {
@@ -397,9 +422,9 @@ impl RequestHandler for UploadHandler {
 
         // Detect MIME type from file extension if not provided
         let final_mime_type = mime_type.or_else(|| {
-            filename.as_ref().and_then(|name| {
-                self.detect_mime_type_from_filename(name)
-            })
+            filename
+                .as_ref()
+                .and_then(|name| self.detect_mime_type_from_filename(name))
         });
 
         // Validate MIME type if provided
@@ -407,7 +432,7 @@ impl RequestHandler for UploadHandler {
             if !self.is_valid_mime_type(mime) {
                 return Ok(Response::bad_request_with_message(
                     request.version,
-                    &format!("Invalid or unsupported MIME type: {}", mime)
+                    &format!("Invalid or unsupported MIME type: {}", mime),
                 ));
             }
         } else {
@@ -419,17 +444,22 @@ impl RequestHandler for UploadHandler {
         }
 
         // Save uploaded file
-        let saved_path = self.save_file(&file_content, filename.as_deref(), final_mime_type.as_deref())?;
+        let saved_path = self.save_file(
+            &file_content,
+            filename.as_deref(),
+            final_mime_type.as_deref(),
+        )?;
 
         // Return success response
         let mut response = Response::new(request.version, StatusCode::CREATED);
         response.set_content_type("application/json");
-        
+
         // Build JSON response with filename and MIME type
-        let filename_str = saved_path.file_name()
+        let filename_str = saved_path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
-        
+
         let json_response = if let Some(mime) = final_mime_type {
             format!(
                 r#"{{"status": "success", "message": "File uploaded successfully", "filename": "{}", "mime_type": "{}"}}"#,

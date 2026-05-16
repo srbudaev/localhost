@@ -60,8 +60,9 @@ impl ResponseSerializer {
         // Chunked body
         if !response.body.is_empty() {
             // Write chunk size and data
-            write!(buffer, "{:x}{}", response.body.len(), CRLF)
-                .map_err(|e| ServerError::HttpError(format!("Failed to write chunk size: {}", e)))?;
+            write!(buffer, "{:x}{}", response.body.len(), CRLF).map_err(|e| {
+                ServerError::HttpError(format!("Failed to write chunk size: {}", e))
+            })?;
             buffer.extend_from_slice(&response.body);
             buffer.extend_from_slice(CRLF.as_bytes());
         }

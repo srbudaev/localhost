@@ -2,34 +2,34 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// HTTP Cookie structure
-/// 
+///
 /// Represents a single cookie with its attributes according to RFC 6265
 #[derive(Debug, Clone)]
 pub struct Cookie {
     /// Cookie name
     pub name: String,
-    
+
     /// Cookie value
     pub value: String,
-    
+
     /// Path attribute (optional)
     pub path: Option<String>,
-    
+
     /// Domain attribute (optional)
     pub domain: Option<String>,
-    
+
     /// Expires attribute (optional)
     pub expires: Option<SystemTime>,
-    
+
     /// Max-Age attribute in seconds (optional)
     pub max_age: Option<u64>,
-    
+
     /// Secure flag - cookie only sent over HTTPS
     pub secure: bool,
-    
+
     /// HttpOnly flag - cookie not accessible via JavaScript
     pub http_only: bool,
-    
+
     /// SameSite attribute (optional)
     pub same_site: Option<SameSite>,
 }
@@ -174,11 +174,11 @@ impl Cookie {
 }
 
 /// Parse Cookie header value into a HashMap of name-value pairs
-/// 
+///
 /// Cookie header format: name1=value1; name2=value2; name3=value3
 pub fn parse_cookie_header(cookie_header: &str) -> HashMap<String, String> {
     let mut cookies = HashMap::new();
-    
+
     for part in cookie_header.split(';') {
         let part = part.trim();
         if let Some(equal_pos) = part.find('=') {
@@ -187,7 +187,7 @@ pub fn parse_cookie_header(cookie_header: &str) -> HashMap<String, String> {
             cookies.insert(name, value);
         }
     }
-    
+
     cookies
 }
 
@@ -211,7 +211,7 @@ mod tests {
             .set_secure(true)
             .set_http_only(true)
             .set_max_age(3600);
-        
+
         assert_eq!(cookie.path, Some("/".to_string()));
         assert!(cookie.secure);
         assert!(cookie.http_only);
@@ -224,7 +224,7 @@ mod tests {
             .set_path("/".to_string())
             .set_http_only(true)
             .set_secure(true);
-        
+
         let header_value = cookie.to_set_cookie_string();
         assert!(header_value.contains("session=abc123"));
         assert!(header_value.contains("Path=/"));
@@ -236,7 +236,7 @@ mod tests {
     fn test_parse_cookie_header() {
         let header = "session_id=abc123; user=john; theme=dark";
         let cookies = parse_cookie_header(header);
-        
+
         assert_eq!(cookies.get("session_id"), Some(&"abc123".to_string()));
         assert_eq!(cookies.get("user"), Some(&"john".to_string()));
         assert_eq!(cookies.get("theme"), Some(&"dark".to_string()));
@@ -246,7 +246,7 @@ mod tests {
     fn test_parse_cookie_header_with_spaces() {
         let header = "session_id = abc123 ; user = john";
         let cookies = parse_cookie_header(header);
-        
+
         assert_eq!(cookies.get("session_id"), Some(&"abc123".to_string()));
         assert_eq!(cookies.get("user"), Some(&"john".to_string()));
     }

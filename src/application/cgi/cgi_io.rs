@@ -1,5 +1,5 @@
-use crate::common::error::{Result, ServerError};
 use crate::common::constants::CRLF_BYTES;
+use crate::common::error::{Result, ServerError};
 use crate::http::headers::Headers;
 use crate::http::response::Response;
 use crate::http::status::StatusCode;
@@ -14,9 +14,11 @@ impl CgiIo {
     /// Write request body to CGI process stdin
     pub fn write_stdin(child: &mut Child, data: &[u8]) -> Result<()> {
         if let Some(ref mut stdin) = child.stdin {
-            stdin.write_all(data)
-                .map_err(|e| ServerError::CgiError(format!("Failed to write to CGI stdin: {}", e)))?;
-            stdin.flush()
+            stdin.write_all(data).map_err(|e| {
+                ServerError::CgiError(format!("Failed to write to CGI stdin: {}", e))
+            })?;
+            stdin
+                .flush()
                 .map_err(|e| ServerError::CgiError(format!("Failed to flush CGI stdin: {}", e)))?;
         }
         Ok(())
@@ -25,9 +27,10 @@ impl CgiIo {
     /// Read CGI process stdout and parse response
     pub fn read_stdout(child: &mut Child) -> Result<Response> {
         let mut output = Vec::new();
-        
+
         if let Some(ref mut stdout) = child.stdout {
-            stdout.read_to_end(&mut output)
+            stdout
+                .read_to_end(&mut output)
                 .map_err(|e| ServerError::CgiError(format!("Failed to read CGI stdout: {}", e)))?;
         }
 
@@ -37,7 +40,7 @@ impl CgiIo {
     /// Read CGI process stderr
     pub fn read_stderr(child: &mut Child) -> Result<String> {
         let mut error = String::new();
-        
+
         if let Some(ref mut stderr) = child.stderr {
             std::io::Read::read_to_string(stderr, &mut error)
                 .map_err(|e| ServerError::CgiError(format!("Failed to read CGI stderr: {}", e)))?;
@@ -54,15 +57,17 @@ impl CgiIo {
         let crlf_len = CRLF_BYTES.len();
         let mut header_end = None;
         for i in 0..output.len().saturating_sub(crlf_len * 2) {
-            if &output[i..i + crlf_len] == CRLF_BYTES 
-                && &output[i + crlf_len..i + crlf_len * 2] == CRLF_BYTES {
+            if &output[i..i + crlf_len] == CRLF_BYTES
+                && &output[i + crlf_len..i + crlf_len * 2] == CRLF_BYTES
+            {
                 header_end = Some(i);
                 break;
             }
         }
-        
-        let header_end = header_end
-            .ok_or_else(|| ServerError::CgiError("CGI output missing header separator".to_string()))?;
+
+        let header_end = header_end.ok_or_else(|| {
+            ServerError::CgiError("CGI output missing header separator".to_string())
+        })?;
 
         // Parse headers
         let header_bytes = &output[..header_end];
@@ -102,14 +107,17 @@ impl CgiIo {
 
     /// Parse Status header (format: "200 OK" or just "200")
     fn parse_status_header(status_str: &str) -> Result<StatusCode> {
-        let parts: Vec<&str> = status_str.trim().split_whitespace().collect();
+        let parts: Vec<&str> = status_str.split_whitespace().collect();
         if parts.is_empty() {
             return Err(ServerError::CgiError("Empty Status header".to_string()));
         }
 
-        let code: u16 = parts[0]
-            .parse()
-            .map_err(|_| ServerError::CgiError(format!("Invalid status code in Status header: {}", parts[0])))?;
+        let code: u16 = parts[0].parse().map_err(|_| {
+            ServerError::CgiError(format!(
+                "Invalid status code in Status header: {}",
+                parts[0]
+            ))
+        })?;
 
         StatusCode::new(code)
             .ok_or_else(|| ServerError::CgiError(format!("Invalid HTTP status code: {}", code)))

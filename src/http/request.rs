@@ -1,7 +1,7 @@
+use crate::http::cookie::parse_cookie_header;
 use crate::http::headers::Headers;
 use crate::http::method::Method;
 use crate::http::version::Version;
-use crate::http::cookie::parse_cookie_header;
 use std::collections::HashMap;
 
 /// HTTP request structure
@@ -58,7 +58,7 @@ impl Request {
         if let Some(query_pos) = self.target.find('?') {
             let query = self.target[query_pos + 1..].to_string();
             let mut params = Vec::new();
-            
+
             for pair in query.split('&') {
                 if let Some(equal_pos) = pair.find('=') {
                     let key = url_decode(&pair[..equal_pos]);
@@ -69,7 +69,7 @@ impl Request {
                     params.push((key, String::new()));
                 }
             }
-            
+
             for (key, value) in params {
                 self.query_params.insert(key, value);
             }
@@ -200,7 +200,8 @@ mod tests {
         let mut req = Request::new(Method::GET, "/".to_string(), Version::Http11);
         assert!(req.should_keep_alive());
 
-        req.headers.set("Connection".to_string(), "close".to_string());
+        req.headers
+            .set("Connection".to_string(), "close".to_string());
         assert!(!req.should_keep_alive());
     }
 }

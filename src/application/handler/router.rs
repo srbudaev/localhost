@@ -27,9 +27,7 @@ impl Router {
         } else if path == "." {
             // "." means root directory
             self.root_path.clone()
-        } else if path.starts_with("./") {
-            // Remove "./" prefix and resolve relative to root_path
-            let relative = &path[2..];
+        } else if let Some(relative) = path.strip_prefix("./") {
             self.root_path.join(relative)
         } else {
             self.root_path.join(path)
@@ -38,7 +36,8 @@ impl Router {
 
     /// Match a request to a route and return the route configuration
     pub fn match_route(&self, request: &Request) -> Option<&RouteConfig> {
-        self.match_route_with_path(request).map(|(_, config)| config)
+        self.match_route_with_path(request)
+            .map(|(_, config)| config)
     }
 
     /// Match a request to a route and return both the matched path and route configuration
@@ -72,7 +71,7 @@ impl Router {
             } else {
                 false
             };
-            
+
             if matches {
                 if let Some((best_path, _)) = &best_match {
                     if route_path.len() > best_path.len() {
@@ -94,19 +93,26 @@ impl Router {
         }
 
         let method_str = request.method.to_string();
-        route.methods.iter().any(|m| m.eq_ignore_ascii_case(&method_str))
+        route
+            .methods
+            .iter()
+            .any(|m| m.eq_ignore_ascii_case(&method_str))
     }
 
     /// Validate route and method, return error response if invalid
     pub fn validate_request(&self, request: &Request) -> Result<(&RouteConfig, Option<Response>)> {
-        let route = self.match_route(request)
+        let route = self
+            .match_route(request)
             .ok_or_else(|| ServerError::HttpError("No matching route".to_string()))?;
 
         if !self.is_method_allowed(request, route) {
-            return Ok((route, Some(Response::method_not_allowed_with_message(
-                request.version,
-                "Method Not Allowed"
-            ))));
+            return Ok((
+                route,
+                Some(Response::method_not_allowed_with_message(
+                    request.version,
+                    "Method Not Allowed",
+                )),
+            ));
         }
 
         Ok((route, None))
@@ -123,7 +129,8 @@ impl Router {
 
         // If route has directory, map path to directory
         if let Some(ref directory) = route.directory {
-            let route_path = self.routes
+            let route_path = self
+                .routes
                 .iter()
                 .find(|(p, _)| path.starts_with(*p))
                 .map(|(p, _)| p.as_str())
@@ -171,7 +178,7 @@ impl Router {
     /// Sanitize path to prevent directory traversal attacks
     fn sanitize_path(&self, path: &str) -> Result<String> {
         let path = Path::new(path);
-        
+
         // Check for directory traversal attempts
         for component in path.components() {
             if let std::path::Component::ParentDir = component {
@@ -217,8 +224,8 @@ mod tests {
     use crate::http::method::Method;
     use crate::http::version::Version;
 
-    fn create_test_config() -> (ServerConfig, PathBuf) {
-        let mut config = ServerConfig {
+    fn empty_server() -> ServerConfig {
+        ServerConfig {
             server_address: "127.0.0.1".parse().unwrap(),
             ports: vec![8080],
             server_name: "test".to_string(),
@@ -227,28 +234,213 @@ mod tests {
             routes: HashMap::new(),
             errors: HashMap::new(),
             cgi_handlers: HashMap::new(),
-        };
+        }
+    }
 
-        let mut route = RouteConfig::default();
-        route.methods = vec!["GET".to_string()];
-        route.directory = Some("static".to_string());
-        config.routes.insert("/static".to_string(), route);
+    fn route_with(methods: &[&str], directory: Option<&str>) -> RouteConfig {
+        RouteConfig {
+            methods: methods.iter().map(|s| s.to_string()).collect(),
+            directory: directory.map(|s| s.to_string()),
+            ..Default::default()
+        }
+    }
 
+    fn create_test_config() -> (ServerConfig, PathBuf) {
+        let mut config = empty_server();
+        config
+            .routes
+            .insert("/static".to_string(), route_with(&["GET"], Some("static")));
         let root = std::env::current_dir().unwrap();
         (config, root)
     }
+
+    fn req(method: Method, target: &str) -> Request {
+        Request::new(method, target.to_string(), Version::Http11)
+    }
+
+    // -----------------------------------------------------------------------
+    // Pre-existing smoke test
+    // -----------------------------------------------------------------------
 
     #[test]
     fn test_route_matching() {
         let (config, root) = create_test_config();
         let router = Router::new(&config, root);
-        
-        let request = Request::new(
-            Method::GET,
-            "/static/file.html".to_string(),
-            Version::Http11,
-        );
-        
+
+        let request = req(Method::GET, "/static/file.html");
         assert!(router.match_route(&request).is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // Exact, prefix, longest-prefix-wins, root fallback
+    // (audit-required: "Test Route Matching logic")
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_exact_match_beats_prefix_match() {
+        let mut config = empty_server();
+        config
+            .routes
+            .insert("/".to_string(), route_with(&["GET"], Some(".")));
+        config.routes.insert(
+            "/upload".to_string(),
+            route_with(&["POST"], Some("uploads")),
+        );
+
+        let router = Router::new(&config, std::env::current_dir().unwrap());
+
+        let (matched_path, _) = router
+            .match_route_with_path(&req(Method::POST, "/upload"))
+            .expect("must match");
+        assert_eq!(matched_path, "/upload");
+    }
+
+    #[test]
+    fn test_longest_prefix_wins() {
+        let mut config = empty_server();
+        config
+            .routes
+            .insert("/".to_string(), route_with(&["GET"], Some(".")));
+        config
+            .routes
+            .insert("/api".to_string(), route_with(&["GET"], Some("api")));
+        config
+            .routes
+            .insert("/api/v1".to_string(), route_with(&["GET"], Some("api_v1")));
+
+        let router = Router::new(&config, std::env::current_dir().unwrap());
+
+        let (matched_path, _) = router
+            .match_route_with_path(&req(Method::GET, "/api/v1/users"))
+            .expect("must match");
+        assert_eq!(
+            matched_path, "/api/v1",
+            "longest matching prefix should win, got {}",
+            matched_path
+        );
+    }
+
+    #[test]
+    fn test_prefix_must_be_followed_by_slash_or_end() {
+        // "/upload" must NOT match "/uploads/file.txt" — that path has its
+        // own boundary semantics.
+        let mut config = empty_server();
+        config.routes.insert(
+            "/upload".to_string(),
+            route_with(&["POST"], Some("uploads")),
+        );
+        config
+            .routes
+            .insert("/".to_string(), route_with(&["GET"], Some(".")));
+
+        let router = Router::new(&config, std::env::current_dir().unwrap());
+
+        let (matched_path, _) = router
+            .match_route_with_path(&req(Method::GET, "/uploads/file.txt"))
+            .expect("must fall through to /");
+        assert_eq!(matched_path, "/", "expected fall-through to root route");
+    }
+
+    #[test]
+    fn test_root_route_catches_unknown_paths() {
+        let mut config = empty_server();
+        config
+            .routes
+            .insert("/".to_string(), route_with(&["GET"], Some(".")));
+
+        let router = Router::new(&config, std::env::current_dir().unwrap());
+
+        assert!(router
+            .match_route(&req(Method::GET, "/whatever/random/path"))
+            .is_some());
+    }
+
+    #[test]
+    fn test_no_match_when_no_root_route() {
+        let mut config = empty_server();
+        config
+            .routes
+            .insert("/api".to_string(), route_with(&["GET"], Some("api")));
+
+        let router = Router::new(&config, std::env::current_dir().unwrap());
+
+        assert!(router
+            .match_route(&req(Method::GET, "/totally/unrelated"))
+            .is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Method validation (audit-required: "list of accepted methods for a route")
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_method_allowed_when_in_list() {
+        let route = route_with(&["GET", "POST"], Some("."));
+        let router = Router::new(&empty_server(), std::env::current_dir().unwrap());
+        assert!(router.is_method_allowed(&req(Method::GET, "/x"), &route));
+        assert!(router.is_method_allowed(&req(Method::POST, "/x"), &route));
+    }
+
+    #[test]
+    fn test_method_rejected_when_not_in_list() {
+        let route = route_with(&["GET"], Some("."));
+        let router = Router::new(&empty_server(), std::env::current_dir().unwrap());
+        assert!(!router.is_method_allowed(&req(Method::POST, "/x"), &route));
+        assert!(!router.is_method_allowed(&req(Method::DELETE, "/x"), &route));
+    }
+
+    #[test]
+    fn test_method_check_is_case_insensitive() {
+        // Methods are persisted as strings in config, audit may compare e.g. "get".
+        let route = RouteConfig {
+            methods: vec!["get".to_string()],
+            ..Default::default()
+        };
+        let router = Router::new(&empty_server(), std::env::current_dir().unwrap());
+        assert!(router.is_method_allowed(&req(Method::GET, "/x"), &route));
+    }
+
+    #[test]
+    fn test_validate_request_returns_405_for_wrong_method() {
+        let mut config = empty_server();
+        config
+            .routes
+            .insert("/only-get".to_string(), route_with(&["GET"], Some(".")));
+        let router = Router::new(&config, std::env::current_dir().unwrap());
+
+        let (_, response) = router
+            .validate_request(&req(Method::DELETE, "/only-get"))
+            .expect("route exists");
+        let response = response.expect("expected 405 response");
+        assert_eq!(response.status.as_u16(), 405);
+    }
+
+    #[test]
+    fn test_validate_request_errors_when_no_route() {
+        let config = empty_server(); // no routes
+        let router = Router::new(&config, std::env::current_dir().unwrap());
+        let result = router.validate_request(&req(Method::GET, "/missing"));
+        assert!(result.is_err(), "missing route must surface as Err");
+    }
+
+    // -----------------------------------------------------------------------
+    // Path sanitization (directory traversal protection)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_resolve_file_path_rejects_parent_dir() {
+        let mut config = empty_server();
+        config
+            .routes
+            .insert("/".to_string(), route_with(&["GET"], None));
+        let router = Router::new(&config, PathBuf::from("/tmp"));
+
+        let request = req(Method::GET, "/../../etc/passwd");
+        let route = router.match_route(&request).unwrap().clone();
+        let result = router.resolve_file_path(&request, &route);
+        assert!(
+            result.is_err(),
+            "directory traversal via '..' must be rejected"
+        );
     }
 }
