@@ -29,7 +29,10 @@ impl ErrorPageHandler {
             .iter()
             .filter_map(|(code, error_config)| {
                 // Only include error pages with filenames
-                error_config.filename.as_ref().map(|filename| (code.clone(), filename.clone()))
+                error_config
+                    .filename
+                    .as_ref()
+                    .map(|filename| (code.clone(), filename.clone()))
             })
             .collect();
 
@@ -70,7 +73,11 @@ impl ErrorPageHandler {
     }
 
     /// Create HTML response with content (helper to reduce redundancy)
-    fn create_html_response(version: Version, status_code: StatusCode, content: Vec<u8>) -> Response {
+    fn create_html_response(
+        version: Version,
+        status_code: StatusCode,
+        content: Vec<u8>,
+    ) -> Response {
         let mut response = Response::new(version, status_code);
         response.set_content_type("text/html");
         response.set_body(content);

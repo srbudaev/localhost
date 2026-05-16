@@ -13,9 +13,8 @@ pub fn parse_config_file(path: &str) -> Result<Config> {
 
 /// Parse configuration from TOML string
 pub fn parse_config(content: &str) -> Result<Config> {
-    toml::from_str(content).map_err(|e| {
-        ServerError::ConfigError(format!("Failed to parse TOML config: {}", e))
-    })
+    toml::from_str(content)
+        .map_err(|e| ServerError::ConfigError(format!("Failed to parse TOML config: {}", e)))
 }
 
 #[cfg(test)]

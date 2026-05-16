@@ -3,7 +3,9 @@ use libc::{c_int, c_void};
 use std::os::unix::io::RawFd;
 
 #[cfg(target_os = "macos")]
-use libc::{kevent, kqueue, kevent as KeventStruct, EV_ADD, EV_DELETE, EV_ENABLE, EVFILT_READ, EVFILT_WRITE};
+use libc::{
+    kevent, kevent as KeventStruct, kqueue, EVFILT_READ, EVFILT_WRITE, EV_ADD, EV_DELETE, EV_ENABLE,
+};
 
 pub use libc::kevent as Kevent;
 

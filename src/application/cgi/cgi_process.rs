@@ -20,7 +20,10 @@ impl CgiProcess {
         // Determine command and arguments
         let (cmd, args) = if let Some(interpreter) = interpreter {
             // Use specified interpreter
-            (interpreter.to_string(), vec![script_path.to_string_lossy().to_string()])
+            (
+                interpreter.to_string(),
+                vec![script_path.to_string_lossy().to_string()],
+            )
         } else {
             // Execute script directly (must be executable)
             (script_path.to_string_lossy().to_string(), Vec::new())
@@ -29,7 +32,7 @@ impl CgiProcess {
         // Build command
         let mut command = Command::new(&cmd);
         command.args(&args);
-        
+
         // Set environment variables
         command.env_clear(); // Clear existing environment for security
         for (key, value) in env_vars {
@@ -51,20 +54,15 @@ impl CgiProcess {
         }
 
         // Spawn process
-        let child = command
-            .spawn()
-            .map_err(|e| {
-                ServerError::CgiError(format!(
-                    "Failed to spawn CGI process for '{}': {}",
-                    script_path.display(),
-                    e
-                ))
-            })?;
+        let child = command.spawn().map_err(|e| {
+            ServerError::CgiError(format!(
+                "Failed to spawn CGI process for '{}': {}",
+                script_path.display(),
+                e
+            ))
+        })?;
 
-        Ok(Self {
-            child,
-            script_path,
-        })
+        Ok(Self { child, script_path })
     }
 
     /// Get mutable reference to child process

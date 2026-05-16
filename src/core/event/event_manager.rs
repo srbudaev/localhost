@@ -31,4 +31,3 @@ impl EventManager {
         self.poller.unregister_write(fd)
     }
 }
-

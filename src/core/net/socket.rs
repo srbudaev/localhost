@@ -49,11 +49,7 @@ impl ClientSocket {
         let fd = FileDescriptor::new(stream.as_raw_fd());
         fd.set_non_blocking()?;
 
-        Ok(Self {
-            stream,
-            addr,
-            fd,
-        })
+        Ok(Self { stream, addr, fd })
     }
 
     pub fn peer_addr(&self) -> SocketAddr {
@@ -72,4 +68,3 @@ impl ClientSocket {
         &mut self.stream
     }
 }
-

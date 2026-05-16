@@ -38,7 +38,11 @@ impl CgiHandler {
     }
 
     /// Check if file is a CGI script based on route configuration
-    fn is_cgi_script(&self, route: &crate::application::config::models::RouteConfig, file_path: &PathBuf) -> bool {
+    fn is_cgi_script(
+        &self,
+        route: &crate::application::config::models::RouteConfig,
+        file_path: &PathBuf,
+    ) -> bool {
         // Check if route has CGI extension configured
         if let Some(ref cgi_ext) = route.cgi_extension {
             if let Some(file_ext) = file_path.extension().and_then(|e| e.to_str()) {
@@ -72,7 +76,7 @@ impl RequestHandler for CgiHandler {
         if !script_path.exists() {
             return Ok(Response::not_found_with_message(
                 request.version,
-                "CGI script not found"
+                "CGI script not found",
             ));
         }
 
@@ -80,7 +84,7 @@ impl RequestHandler for CgiHandler {
         if !self.is_cgi_script(route, &script_path) {
             return Ok(Response::forbidden_with_message(
                 request.version,
-                "Not a CGI script"
+                "Not a CGI script",
             ));
         }
 
@@ -96,18 +100,14 @@ impl RequestHandler for CgiHandler {
             self.server_port,
         ) {
             Ok(response) => Ok(response),
-            Err(ServerError::CgiError(msg)) => {
-                Ok(Response::internal_error_with_message(
-                    request.version,
-                    &format!("CGI Error: {}", msg)
-                ))
-            }
-            Err(ServerError::TimeoutError(msg)) => {
-                Ok(Response::gateway_timeout_with_message(
-                    request.version,
-                    &format!("CGI Timeout: {}", msg)
-                ))
-            }
+            Err(ServerError::CgiError(msg)) => Ok(Response::internal_error_with_message(
+                request.version,
+                &format!("CGI Error: {}", msg),
+            )),
+            Err(ServerError::TimeoutError(msg)) => Ok(Response::gateway_timeout_with_message(
+                request.version,
+                &format!("CGI Timeout: {}", msg),
+            )),
             Err(e) => Err(e),
         }
     }

@@ -38,7 +38,8 @@ impl Router {
 
     /// Match a request to a route and return the route configuration
     pub fn match_route(&self, request: &Request) -> Option<&RouteConfig> {
-        self.match_route_with_path(request).map(|(_, config)| config)
+        self.match_route_with_path(request)
+            .map(|(_, config)| config)
     }
 
     /// Match a request to a route and return both the matched path and route configuration
@@ -72,7 +73,7 @@ impl Router {
             } else {
                 false
             };
-            
+
             if matches {
                 if let Some((best_path, _)) = &best_match {
                     if route_path.len() > best_path.len() {
@@ -94,19 +95,26 @@ impl Router {
         }
 
         let method_str = request.method.to_string();
-        route.methods.iter().any(|m| m.eq_ignore_ascii_case(&method_str))
+        route
+            .methods
+            .iter()
+            .any(|m| m.eq_ignore_ascii_case(&method_str))
     }
 
     /// Validate route and method, return error response if invalid
     pub fn validate_request(&self, request: &Request) -> Result<(&RouteConfig, Option<Response>)> {
-        let route = self.match_route(request)
+        let route = self
+            .match_route(request)
             .ok_or_else(|| ServerError::HttpError("No matching route".to_string()))?;
 
         if !self.is_method_allowed(request, route) {
-            return Ok((route, Some(Response::method_not_allowed_with_message(
-                request.version,
-                "Method Not Allowed"
-            ))));
+            return Ok((
+                route,
+                Some(Response::method_not_allowed_with_message(
+                    request.version,
+                    "Method Not Allowed",
+                )),
+            ));
         }
 
         Ok((route, None))
@@ -123,7 +131,8 @@ impl Router {
 
         // If route has directory, map path to directory
         if let Some(ref directory) = route.directory {
-            let route_path = self.routes
+            let route_path = self
+                .routes
                 .iter()
                 .find(|(p, _)| path.starts_with(*p))
                 .map(|(p, _)| p.as_str())
@@ -171,7 +180,7 @@ impl Router {
     /// Sanitize path to prevent directory traversal attacks
     fn sanitize_path(&self, path: &str) -> Result<String> {
         let path = Path::new(path);
-        
+
         // Check for directory traversal attempts
         for component in path.components() {
             if let std::path::Component::ParentDir = component {
@@ -274,9 +283,10 @@ mod tests {
         config
             .routes
             .insert("/".to_string(), route_with(&["GET"], Some(".")));
-        config
-            .routes
-            .insert("/upload".to_string(), route_with(&["POST"], Some("uploads")));
+        config.routes.insert(
+            "/upload".to_string(),
+            route_with(&["POST"], Some("uploads")),
+        );
 
         let router = Router::new(&config, std::env::current_dir().unwrap());
 
@@ -292,14 +302,12 @@ mod tests {
         config
             .routes
             .insert("/".to_string(), route_with(&["GET"], Some(".")));
-        config.routes.insert(
-            "/api".to_string(),
-            route_with(&["GET"], Some("api")),
-        );
-        config.routes.insert(
-            "/api/v1".to_string(),
-            route_with(&["GET"], Some("api_v1")),
-        );
+        config
+            .routes
+            .insert("/api".to_string(), route_with(&["GET"], Some("api")));
+        config
+            .routes
+            .insert("/api/v1".to_string(), route_with(&["GET"], Some("api_v1")));
 
         let router = Router::new(&config, std::env::current_dir().unwrap());
 

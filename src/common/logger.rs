@@ -18,4 +18,3 @@ impl Logger {
         println!("[DEBUG] {}", msg);
     }
 }
-

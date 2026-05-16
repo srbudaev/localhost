@@ -45,9 +45,7 @@ impl DirectoryListingHandler {
         let entries = fs::read_dir(dir_path)
             .map_err(|e| ServerError::HttpError(format!("Failed to read directory: {}", e)))?;
 
-        let mut entries: Vec<_> = entries
-            .filter_map(|e| e.ok())
-            .collect();
+        let mut entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
 
         // Sort entries: directories first, then files
         entries.sort_by(|a, b| {
@@ -128,7 +126,7 @@ impl RequestHandler for DirectoryListingHandler {
         if !self.router.is_directory_listing_enabled(route) {
             return Ok(Response::forbidden_with_message(
                 request.version,
-                "Directory listing is disabled"
+                "Directory listing is disabled",
             ));
         }
 

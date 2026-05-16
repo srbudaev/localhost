@@ -62,9 +62,7 @@ impl Headers {
     /// Check if header exists (case-insensitive)
     pub fn contains(&self, name: &str) -> bool {
         let name_lower = name.to_lowercase();
-        self.headers
-            .keys()
-            .any(|k| k.to_lowercase() == name_lower)
+        self.headers.keys().any(|k| k.to_lowercase() == name_lower)
     }
 
     /// Get all headers as iterator

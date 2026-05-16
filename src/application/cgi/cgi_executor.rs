@@ -54,7 +54,8 @@ impl CgiExecutor {
         };
 
         // Spawn CGI process
-        let mut process = CgiProcess::spawn(script_path.clone(), interpreter, &env_vars, body_data)?;
+        let mut process =
+            CgiProcess::spawn(script_path.clone(), interpreter, &env_vars, body_data)?;
 
         // Write request body to stdin if present
         if let Some(body) = body_data {

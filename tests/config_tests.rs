@@ -17,11 +17,8 @@ use std::path::PathBuf;
 /// Create (and return) a unique, existing temp directory that can be used as
 /// a server `root`. The validator requires `root` to exist and be a directory.
 fn make_temp_root(tag: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!(
-        "localhost_cfg_test_{}_{}",
-        tag,
-        std::process::id()
-    ));
+    let path =
+        std::env::temp_dir().join(format!("localhost_cfg_test_{}_{}", tag, std::process::id()));
     fs::create_dir_all(&path).unwrap();
     path
 }
@@ -184,8 +181,14 @@ directory = "."
     let path = write_temp_toml("cgi_errors", &toml);
     let cfg = ConfigLoader::load(path.to_str().unwrap()).expect("load");
 
-    assert_eq!(cfg.servers[0].cgi_handlers.get(".py").map(String::as_str), Some("python3"));
-    assert_eq!(cfg.servers[0].cgi_handlers.get(".sh").map(String::as_str), Some("/bin/sh"));
+    assert_eq!(
+        cfg.servers[0].cgi_handlers.get(".py").map(String::as_str),
+        Some("python3")
+    );
+    assert_eq!(
+        cfg.servers[0].cgi_handlers.get(".sh").map(String::as_str),
+        Some("/bin/sh")
+    );
     assert!(cfg.servers[0].errors.contains_key("404"));
     assert!(cfg.servers[0].errors.contains_key("500"));
 }
@@ -525,5 +528,8 @@ client_max_body_size = 1048576
 
     let path = write_temp_toml("no_servers", toml);
     let result = ConfigLoader::load(path.to_str().unwrap());
-    assert!(result.is_err(), "config without any servers must be rejected");
+    assert!(
+        result.is_err(),
+        "config without any servers must be rejected"
+    );
 }

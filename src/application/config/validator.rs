@@ -53,7 +53,10 @@ fn validate_port_conflicts(config: &Config) -> Result<()> {
 
     for (idx, server) in config.servers.iter().enumerate() {
         for port in &server.ports {
-            port_to_servers.entry(*port).or_insert_with(Vec::new).push(idx);
+            port_to_servers
+                .entry(*port)
+                .or_insert_with(Vec::new)
+                .push(idx);
         }
     }
 
@@ -64,13 +67,13 @@ fn validate_port_conflicts(config: &Config) -> Result<()> {
             let mut addresses = HashSet::new();
             let mut server_names = Vec::new();
             let mut name_set = HashSet::new();
-            
+
             for &idx in &indices {
                 let server = &config.servers[idx];
                 addresses.insert(server.server_address);
                 let server_name = server.server_name.clone();
                 let server_name_lower = server_name.to_lowercase();
-                
+
                 // Check for duplicate server_name
                 if name_set.contains(&server_name_lower) {
                     let conflicting_servers: Vec<String> = indices
@@ -84,18 +87,21 @@ fn validate_port_conflicts(config: &Config) -> Result<()> {
                         port, conflicting_servers
                     )));
                 }
-                
+
                 name_set.insert(server_name_lower);
                 server_names.push(server_name);
             }
-            
+
             // Check that all servers on the same port use the same address
             if addresses.len() > 1 {
                 let server_info: Vec<String> = indices
                     .iter()
                     .map(|&i| {
                         let s = &config.servers[i];
-                        format!("{} (server_name: {}, address: {})", i, s.server_name, s.server_address)
+                        format!(
+                            "{} (server_name: {}, address: {})",
+                            i, s.server_name, s.server_address
+                        )
                     })
                     .collect();
                 return Err(ServerError::ConfigError(format!(
@@ -105,7 +111,7 @@ fn validate_port_conflicts(config: &Config) -> Result<()> {
                     port, server_info
                 )));
             }
-            
+
             // All validations passed - servers can share the port with different server_name values
             // They will be resolved by Host header matching
         }
@@ -297,7 +303,8 @@ fn validate_route(route: &RouteConfig, path: &str, server_idx: usize) -> Result<
                 server_idx, path
             )));
         }
-        if !redirect.starts_with('/') && !redirect.starts_with("http://")
+        if !redirect.starts_with('/')
+            && !redirect.starts_with("http://")
             && !redirect.starts_with("https://")
         {
             return Err(ServerError::ConfigError(format!(

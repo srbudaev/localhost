@@ -34,4 +34,3 @@ impl From<std::io::Error> for ServerError {
 }
 
 pub type Result<T> = std::result::Result<T, ServerError>;
-

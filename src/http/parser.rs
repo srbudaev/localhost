@@ -109,7 +109,7 @@ impl RequestParser {
             self.buffer.extend(data);
             return Ok(());
         };
-        
+
         // Check if adding this data would exceed limit (only in body state)
         if matches!(self.state, ParseState::Body | ParseState::ChunkedBody) {
             self.check_would_exceed_limit(self.current_body_size, self.buffer.len() + data.len())?;
@@ -174,12 +174,15 @@ impl RequestParser {
     fn parse_request_line(&mut self) -> Result<Option<Request>> {
         if let Some(crlf_pos) = self.buffer.find(CRLF_BYTES) {
             let line_bytes = self.buffer.drain(crlf_pos + CRLF_BYTES.len());
-            let line = str::from_utf8(&line_bytes[..crlf_pos])
-                .map_err(|e| ServerError::ParseError(format!("Invalid UTF-8 in request line: {}", e)))?;
+            let line = str::from_utf8(&line_bytes[..crlf_pos]).map_err(|e| {
+                ServerError::ParseError(format!("Invalid UTF-8 in request line: {}", e))
+            })?;
 
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() < 2 {
-                return Err(ServerError::ParseError("Invalid request line format".to_string()));
+                return Err(ServerError::ParseError(
+                    "Invalid request line format".to_string(),
+                ));
             }
 
             let method = Method::from_str(parts[0])
@@ -205,8 +208,9 @@ impl RequestParser {
         loop {
             if let Some(crlf_pos) = self.buffer.find(CRLF_BYTES) {
                 let line_bytes = self.buffer.drain(crlf_pos + CRLF_BYTES.len());
-                let line = str::from_utf8(&line_bytes[..crlf_pos])
-                    .map_err(|e| ServerError::ParseError(format!("Invalid UTF-8 in header: {}", e)))?;
+                let line = str::from_utf8(&line_bytes[..crlf_pos]).map_err(|e| {
+                    ServerError::ParseError(format!("Invalid UTF-8 in header: {}", e))
+                })?;
 
                 // Empty line indicates end of headers
                 if line.is_empty() {
@@ -259,21 +263,21 @@ impl RequestParser {
         let available = self.buffer.len();
         let current_size = self.current_body_size;
         let expected_size_opt = self.expected_body_size;
-        
+
         match expected_size_opt {
             Some(expected_size) => {
                 // Content-Length specified - parse exact amount
                 // Check if we're exceeding max body size
                 self.check_would_exceed_limit(current_size, available)?;
-                
+
                 if available >= expected_size {
                     let body = self.buffer.drain(expected_size);
                     self.current_body_size += body.len();
                     let new_size = self.current_body_size; // Store to avoid borrow conflict
-                    
+
                     // Final check
                     self.check_current_body_size(new_size)?;
-                    
+
                     // Now we can safely borrow request mutably
                     if let Some(ref mut request) = self.request {
                         request.body = body;
@@ -285,7 +289,7 @@ impl RequestParser {
                 // No Content-Length - for POST/PUT/PATCH, read until buffer is empty or limit reached
                 // Check if we're exceeding max body size
                 self.check_would_exceed_limit(current_size, available)?;
-                
+
                 // For requests without Content-Length, we read all available data
                 // This is a simplified approach - in production, you might want to limit
                 // by connection timeout or other means
@@ -293,10 +297,10 @@ impl RequestParser {
                     let body = self.buffer.drain(available);
                     self.current_body_size += body.len();
                     let new_size = self.current_body_size; // Store to avoid borrow conflict
-                    
+
                     // Final check
                     self.check_current_body_size(new_size)?;
-                    
+
                     // Now we can safely borrow request mutably
                     if let Some(ref mut request) = self.request {
                         request.body = body;
@@ -317,8 +321,9 @@ impl RequestParser {
             // Parse chunk size line
             if let Some(crlf_pos) = self.buffer.find(CRLF_BYTES) {
                 let line_bytes = self.buffer.drain(crlf_pos + CRLF_BYTES.len());
-                let line = str::from_utf8(&line_bytes[..crlf_pos])
-                    .map_err(|e| ServerError::ParseError(format!("Invalid UTF-8 in chunk size: {}", e)))?;
+                let line = str::from_utf8(&line_bytes[..crlf_pos]).map_err(|e| {
+                    ServerError::ParseError(format!("Invalid UTF-8 in chunk size: {}", e))
+                })?;
 
                 // Parse chunk size (hex)
                 let chunk_size_str = line.split(';').next().unwrap_or(line).trim();
@@ -333,10 +338,10 @@ impl RequestParser {
                     if self.buffer.len() >= CRLF_BYTES.len() {
                         self.buffer.drain(CRLF_BYTES.len());
                     }
-                    
+
                     // Final check for max body size
                     self.check_current_body_size(current_size)?;
-                    
+
                     // Now we can safely borrow request mutably
                     if let Some(ref mut request) = self.request {
                         request.body = body;
@@ -412,14 +417,19 @@ mod tests {
         parser.add_data(request_str.as_bytes()).unwrap();
         let request = parser.parse().unwrap().unwrap();
         assert_eq!(request.path(), "/search");
-        assert_eq!(request.query_params.get("q").map(String::as_str), Some("rust"));
-        assert_eq!(request.query_params.get("page").map(String::as_str), Some("2"));
+        assert_eq!(
+            request.query_params.get("q").map(String::as_str),
+            Some("rust")
+        );
+        assert_eq!(
+            request.query_params.get("page").map(String::as_str),
+            Some("2")
+        );
     }
 
     #[test]
     fn test_parse_headers_case_insensitive_lookup() {
-        let request_str =
-            "GET / HTTP/1.1\r\nHost: example.com\r\nContent-Type: text/plain\r\n\r\n";
+        let request_str = "GET / HTTP/1.1\r\nHost: example.com\r\nContent-Type: text/plain\r\n\r\n";
         let mut parser = RequestParser::new();
         parser.add_data(request_str.as_bytes()).unwrap();
         let request = parser.parse().unwrap().unwrap();

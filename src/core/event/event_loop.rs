@@ -27,4 +27,3 @@ impl EventLoop {
         Ok(&self.events[..n])
     }
 }
-

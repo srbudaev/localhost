@@ -108,7 +108,7 @@ pub struct ErrorPageConfig {
     /// Filename of the error page (optional - if redirect is set, this is ignored)
     #[serde(default)]
     pub filename: Option<String>,
-    
+
     /// Redirect URL for this error (optional - if set, redirects instead of showing error page)
     #[serde(default)]
     pub redirect: Option<String>,

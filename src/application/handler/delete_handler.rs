@@ -19,7 +19,11 @@ impl DeleteHandler {
     }
 
     /// Safely delete a file
-    fn delete_file(&self, file_path: &Path, version: crate::http::version::Version) -> Result<Response> {
+    fn delete_file(
+        &self,
+        file_path: &Path,
+        version: crate::http::version::Version,
+    ) -> Result<Response> {
         // Check if file exists
         if !file_path.exists() {
             return Ok(Response::not_found_with_message(version, "File not found"));
@@ -27,12 +31,18 @@ impl DeleteHandler {
 
         // Check if it's a directory (DELETE should not delete directories)
         if file_path.is_dir() {
-            return Ok(Response::forbidden_with_message(version, "Cannot delete directory"));
+            return Ok(Response::forbidden_with_message(
+                version,
+                "Cannot delete directory",
+            ));
         }
 
         // Check if it's a file
         if !file_path.is_file() {
-            return Ok(Response::forbidden_with_message(version, "Path is not a file"));
+            return Ok(Response::forbidden_with_message(
+                version,
+                "Path is not a file",
+            ));
         }
 
         // Attempt to delete the file
@@ -46,18 +56,17 @@ impl DeleteHandler {
             Err(e) => {
                 // Error deleting file
                 match e.kind() {
-                    std::io::ErrorKind::PermissionDenied => {
-                        Ok(Response::forbidden_with_message(version, "Permission denied"))
-                    }
+                    std::io::ErrorKind::PermissionDenied => Ok(Response::forbidden_with_message(
+                        version,
+                        "Permission denied",
+                    )),
                     std::io::ErrorKind::NotFound => {
                         Ok(Response::not_found_with_message(version, "File not found"))
                     }
-                    _ => {
-                        Ok(Response::internal_error_with_message(
-                            version,
-                            &format!("Failed to delete file: {}", e)
-                        ))
-                    }
+                    _ => Ok(Response::internal_error_with_message(
+                        version,
+                        &format!("Failed to delete file: {}", e),
+                    )),
                 }
             }
         }
@@ -70,18 +79,19 @@ impl RequestHandler for DeleteHandler {
         if request.method != Method::DELETE {
             return Ok(Response::method_not_allowed_with_message(
                 request.version,
-                "Only DELETE method is allowed"
+                "Only DELETE method is allowed",
             ));
         }
 
         // Match route (without method validation since DELETE was already checked by server manager)
         // We still need to match the route to get the file path, but we skip method validation
-        let route = self.router.match_route(request)
-            .ok_or_else(|| crate::common::error::ServerError::HttpError("No matching route".to_string()))?;
+        let route = self.router.match_route(request).ok_or_else(|| {
+            crate::common::error::ServerError::HttpError("No matching route".to_string())
+        })?;
 
         // Resolve file path
         let file_path = self.router.resolve_file_path(request, route)?;
-        
+
         // Log the resolved path for debugging
         crate::common::logger::Logger::info(&format!(
             "DeleteHandler: Request path='{}', Resolved file path='{}', exists={}",
@@ -94,11 +104,3 @@ impl RequestHandler for DeleteHandler {
         self.delete_file(&file_path, request.version)
     }
 }
-
-
-
-
-
-
-
-
