@@ -1,0 +1,42 @@
+name: Security audit
+
+# Run weekly + when Cargo.lock changes. cargo-audit checks every dependency
+# against the RustSec Advisory Database (CVEs, yanks, unmaintained crates).
+on:
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audit.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cargo-audit:
+    name: cargo audit
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & cargo-audit binary
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: audit-${{ runner.os }}
+          # cargo-audit is installed via `cargo install`; keep it cached.
+          cache-targets: "false"
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked || true
+
+      - name: Run cargo audit
+        run: cargo audit
