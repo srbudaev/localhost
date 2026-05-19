@@ -170,3 +170,17 @@ cgi_extension = "py"
 "405" = { filename = "errors/405.html" }
 "413" = { filename = "errors/413.html" }
 "500" = { filename = "errors/500.html" }
+
+# Server for HTML presentation
+[[servers]]
+server_address = "127.0.0.1"
+ports = [8083]
+server_name = "presentation"
+root = "./root"
+admin_access = false
+
+[servers.routes."/"]
+methods = ["GET"]
+directory = "."
+default_file = "presentation.html"
+directory_listing = false
