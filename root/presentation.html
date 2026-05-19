@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Localhost — Professional Audit 4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <style>
+    :root {
+      --bg: #06060B;
+      --surface: #0D0D18;
+      --surface-2: #151522;
+      --border: #25253A;
+      --border-hi: #38384E;
+      --text: #EEEEF8;
+      --text-muted: #A8A8C8;
+      --text-dim: #7878A0;
+      --accent: #A78BFA;
+      --accent-hi: #C4B5FD;
+      --success: #6EE7B7;
+      --purple: #A78BFA;
+      --yellow: #FCD34D;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      background: #06060B !important
+    }
+
+    .reveal-viewport,
+    .reveal,
+    .reveal .slide-background,
+    .reveal .slide-background-content {
+      background: #06060B !important;
+      background-color: #06060B !important
+    }
+
+    .reveal {
+      font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      color: var(--text);
+      font-weight: 400;
+      letter-spacing: -0.01em
+    }
+
+    .reveal .slides {
+      text-align: left
+    }
+
+    .reveal .slides>section {
+      padding: 48px 64px !important;
+      margin-top: 10vh;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center
+    }
+
+    .reveal h1,
+    .reveal h2,
+    .reveal h3 {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      margin: 0;
+      color: var(--text);
+      text-transform: none
+    }
+
+    .reveal h1 {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1.05
+    }
+
+    .reveal h2 {
+      font-size: 30px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 28px 0;
+      letter-spacing: -0.015em
+    }
+
+    .reveal p {
+      margin: 0;
+      line-height: 1.5
+    }
+
+    .reveal code,
+    .reveal pre {
+      font-family: 'JetBrains Mono', Consolas, monospace
+    }
+
+    .reveal pre {
+      box-shadow: none;
+      background: transparent;
+      margin: 0
+    }
+
+    .reveal .progress {
+      color: var(--accent);
+      height: 2px
+    }
+
+    .reveal .controls {
+      color: var(--accent)
+    }
+
+    /* chrome */
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      margin-bottom: 18px
+    }
+
+    .kicker {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-top: 24px;
+      letter-spacing: 0.01em;
+      line-height: 1.5
+    }
+
+    .slide-no {
+      position: absolute;
+      bottom: 20px;
+      right: 32px;
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.15em
+    }
+
+    .slide-mark {
+      position: absolute;
+      top: 24px;
+      left: 32px;
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 0.24em;
+      font-weight: 700;
+      text-transform: uppercase
+    }
+
+    /* TITLE */
+    .title-slide h1 {
+      font-size: 96px;
+      font-weight: 900;
+      line-height: 0.95
+    }
+
+    .title-slide h1 .dot {
+      color: var(--accent)
+    }
+
+    .title-slide .brand {
+      font-size: 11px;
+      letter-spacing: 0.32em;
+      color: var(--accent);
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 32px
+    }
+
+    .title-slide .sub {
+      font-size: 18px;
+      color: var(--text-muted);
+      margin-top: 28px;
+      max-width: 560px;
+      line-height: 1.55;
+      font-weight: 400
+    }
+
+    .title-slide .meta {
+      display: flex;
+      gap: 48px;
+      margin-top: 64px;
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 600
+    }
+
+    .title-slide .meta span b {
+      color: var(--text);
+      font-weight: 700;
+      display: block;
+      margin-top: 6px;
+      font-size: 17px;
+      letter-spacing: -0.01em;
+      text-transform: none
+    }
+
+    /* SECTION DIVIDER */
+    .section .num {
+      font-size: 13px;
+      color: var(--accent);
+      letter-spacing: 0.3em;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 24px
+    }
+
+    .section h1 {
+      font-size: 88px;
+      font-weight: 800;
+      line-height: 1
+    }
+
+    .section .lead {
+      font-size: 18px;
+      color: var(--text-muted);
+      margin-top: 28px;
+      max-width: 560px;
+      line-height: 1.6;
+      font-weight: 400
+    }
+
+    /* STATS */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px
+    }
+
+    .stat {
+      background: linear-gradient(145deg, var(--surface), var(--surface-2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 22px;
+      position: relative;
+      overflow: hidden
+    }
+
+    .stat .num {
+      font-size: 48px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1;
+      letter-spacing: -0.04em
+    }
+
+    .stat .num.accent {
+      background: linear-gradient(135deg, var(--accent), var(--accent-hi));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text
+    }
+
+    .stat .label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-weight: 700;
+      margin-top: 14px
+    }
+
+    .stat .desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.4
+    }
+
+    /* TWO-COL LISTS */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px
+    }
+
+    .list-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 26px
+    }
+
+    .list-col .l-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-weight: 700;
+      margin-bottom: 10px
+    }
+
+    .list-col h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      letter-spacing: -0.015em;
+      color: var(--accent)
+    }
+
+    .list-col ul {
+      list-style: none;
+      padding: 0;
+      margin: 0
+    }
+
+    .list-col li {
+      font-size: 13.5px;
+      padding: 8px 0;
+      color: var(--text);
+      line-height: 1.45;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .list-col li:last-child {
+      border-bottom: none
+    }
+
+    .list-col li::before {
+      content: '';
+      flex-shrink: 0;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--success);
+      margin-top: 8px
+    }
+
+    .list-col li.warn::before {
+      background: var(--accent)
+    }
+
+    /* LAYERS / FLOW STEPS */
+    .layers {
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .layer {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 22px
+    }
+
+    .layer .lnum {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      width: 28px;
+      font-family: 'JetBrains Mono', monospace
+    }
+
+    .layer .ltitle {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      min-width: 180px;
+      letter-spacing: 0.01em
+    }
+
+    .layer .ldesc {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-weight: 400;
+      line-height: 1.45;
+      flex: 1
+    }
+
+    .layer.active {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(167, 139, 250, 0.09), rgba(167, 139, 250, 0.03))
+    }
+
+    .layer.active .ltitle {
+      color: var(--accent)
+    }
+
+    /* FLOW grid for pipeline */
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px
+    }
+
+    .flow-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px
+    }
+
+    .flow-step .fnum {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 700;
+      min-width: 24px;
+      letter-spacing: 0.05em;
+      padding-top: 2px
+    }
+
+    .flow-step .fbody {
+      flex: 1
+    }
+
+    .flow-step .ftitle {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      margin-bottom: 4px
+    }
+
+    .flow-step .fdesc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.45
+    }
+
+    /* TABLE */
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px
+    }
+
+    .table th {
+      color: var(--text-dim);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border)
+    }
+
+    .table td {
+      padding: 12px 14px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border)
+    }
+
+    .table td.muted {
+      color: var(--text-muted)
+    }
+
+    .table td code {
+      font-size: 13px;
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace
+    }
+
+    .table tr:last-child td {
+      border-bottom: none
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase
+    }
+
+    .tag.good {
+      background: rgba(110, 231, 183, 0.10);
+      color: var(--success);
+      border: 1px solid rgba(110, 231, 183, 0.22)
+    }
+
+    .tag.warn {
+      background: rgba(167, 139, 250, 0.10);
+      color: var(--accent);
+      border: 1px solid rgba(167, 139, 250, 0.22)
+    }
+
+    /* CODE block */
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+      box-shadow: 0 6px 28px rgba(0, 0, 0, 0.5)
+    }
+
+    .code-bar {
+      background: var(--surface-2);
+      padding: 10px 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .code-bar .dots {
+      display: inline-flex;
+      gap: 5px
+    }
+
+    .code-bar .dots i {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--border-hi)
+    }
+
+    .code-content {
+      padding: 18px 22px;
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--text-muted)
+    }
+
+    .code-content .key {
+      color: #A78BFA
+    }
+
+    .code-content .str {
+      color: #86EFAC
+    }
+
+    .code-content .com {
+      color: var(--text-dim)
+    }
+
+    .code-content .yel {
+      color: #FCD34D
+    }
+
+    /* VALUE GRID */
+    .values {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px
+    }
+
+    .value {
+      background: linear-gradient(145deg, var(--surface), var(--surface-2));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px
+    }
+
+    .value .vidx {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.18em
+    }
+
+    .value .vtitle {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em
+    }
+
+    .value .vdesc {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.55
+    }
+
+    /* HERO QUOTE */
+    .hero {
+      text-align: center
+    }
+
+    .hero .quote {
+      font-size: 34px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      line-height: 1.3;
+      color: var(--text);
+      max-width: 900px;
+      margin: 0 auto
+    }
+
+    .hero .quote em {
+      color: var(--accent);
+      font-style: normal
+    }
+
+    .hero .attribution {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-top: 28px;
+      font-weight: 700;
+      text-align: center
+    }
+
+    /* CLOSE */
+    .statement .label {
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 18px
+    }
+
+    .statement .big {
+      font-size: 64px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      color: var(--text)
+    }
+
+    .statement .big .dim {
+      color: var(--text-dim)
+    }
+
+    .statement .sub {
+      font-size: 16px;
+      color: var(--text-muted);
+      margin-top: 24px;
+      max-width: 640px;
+      line-height: 1.6
+    }
+
+    .statement .foot {
+      margin-top: 48px;
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      font-weight: 700
+    }
+  </style>
+</head>
+
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- 01 TITLE -->
+      <section data-transition="fade">
+        <div class="title-slide">
+          <div class="brand">Professional Audit 4 · Software Testing</div>
+          <h1>Localhost<span class="dot">.</span></h1>
+          <div class="sub">An HTTP/1.1 web server in Rust — testing strategy, CI pipeline, and quality reasoning.</div>
+          <div class="meta">
+            <span>TECH STACK<b>Rust</b></span>
+            <span>PROTOCOL<b>HTTP/1.1</b></span>
+            <span>I/O<b>kqueue · epoll</b></span>
+
+          </div>
+        </div>
+        <span class="slide-no">01 / 15</span>
+      </section>
+
+      <!-- 02 PROJECT OVERVIEW + KEY NUMBERS -->
+      <section data-transition="fade">
+        <div class="slide-mark">Project Overview</div>
+
+        <h2>An HTTP/1.1 server from scratch — and the test suite that proves it works</h2>
+        <div class="stats">
+
+          <div class="stat">
+            <div class="num">8</div>
+            <div class="label">Request handlers</div>
+            <div class="desc">Static · CGI · upload · more</div>
+          </div>
+          <div class="stat">
+            <div class="num">6</div>
+            <div class="label">Test files</div>
+            <div class="desc">Integration · CGI · stress</div>
+          </div>
+          <div class="stat">
+            <div class="num">~4 min</div>
+            <div class="label">CI pipeline</div>
+            <div class="desc">Check · lint · fmt · test · cov</div>
+          </div>
+        </div>
+        <div class="kicker">Four-layer architecture · zero framework dependencies · standard <code>cargo test</code>.
+        </div>
+        <span class="slide-no">02 / 15</span>
+      </section>
+
+      <!-- 03 COLLABORATION & COMMUNICATION -->
+      <section data-transition="fade">
+        <div class="slide-mark">Collaboration</div>
+        <h2>How we communicate — and why each channel</h2>
+        <div class="two-col">
+          <div class="list-col">
+            <div class="l-eyebrow">Fast &amp; informal</div>
+            <h3>Discord &amp; WhatsApp</h3>
+            <ul>
+              <li>Quick coordination, status checks, "I'm stuck" pings</li>
+              <li>Voice when debugging together in real time</li>
+              <li class="warn">Downside: messages get lost, no record</li>
+            </ul>
+          </div>
+          <div class="list-col">
+            <div class="l-eyebrow">Durable &amp; technical</div>
+            <h3>GitHub &amp; email</h3>
+            <ul>
+              <li>Pull requests with line-level review &amp; discussion</li>
+              <li>Issues for bug reports &amp; reproduction steps</li>
+              <li>Everything stays documented and searchable</li>
+            </ul>
+          </div>
+        </div>
+        <div class="kicker">Chat for speed. GitHub for anything that has to outlive the conversation.</div>
+        <span class="slide-no">03 / 15</span>
+      </section>
+
+      <!-- 04 REQUIREMENTS & DOCS -->
+      <section data-transition="fade">
+        <div class="slide-mark">Requirements &amp; Docs</div>
+        <h2>Functional requirements &amp; how docs mirror them</h2>
+        <div class="two-col">
+          <div class="list-col">
+            <div class="l-eyebrow">Functional requirements</div>
+            <h3>What the server must do</h3>
+            <ul>
+              <li>Accept TCP connections, parse HTTP, send correct responses</li>
+              <li>Routing &amp; static files; proper status codes (404, 405, …)</li>
+              <li>Many clients without blocking · keep-alive &amp; clean close</li>
+              <li>Uploads, deletion, CGI, custom error pages</li>
+              <li class="warn">Handle invalid requests safely — never crash</li>
+            </ul>
+          </div>
+          <div class="list-col">
+            <div class="l-eyebrow">Documentation structure</div>
+            <h3>Mirrors the architecture</h3>
+            <ul>
+              <li>Core layer — sockets, event loop, connections</li>
+              <li>HTTP layer — parser, serializer, headers, cookies</li>
+              <li>Application layer — router, handlers, CGI, config</li>
+              <li>Config examples — uploads, redirects, error pages</li>
+              <li>Request flow &amp; event-loop sections tie it together</li>
+            </ul>
+          </div>
+        </div>
+        <div class="kicker">Each requirement maps to a documented section — and to a handler in code.</div>
+        <span class="slide-no">04 / 15</span>
+      </section>
+
+      <!-- 05 ARCHITECTURE -->
+      <section data-transition="fade">
+        <div class="slide-mark">Architecture</div>
+        <h2>Four layers, clear contracts</h2>
+        <div class="layers">
+          <div class="layer active">
+            <div class="lnum">01</div>
+            <div class="ltitle">Core Layer</div>
+            <div class="ldesc">EventLoop (kqueue · epoll) · EventManager · Poller · Connection · Socket</div>
+          </div>
+          <div class="layer">
+            <div class="lnum">02</div>
+            <div class="ltitle">Application Layer</div>
+            <div class="ldesc">ServerManager · Router O(1) · 8 Request Handlers · CGI · Config</div>
+          </div>
+          <div class="layer">
+            <div class="lnum">03</div>
+            <div class="ltitle">HTTP Layer</div>
+            <div class="ldesc">Parser (state machine) · Serializer · Request/Response · Headers · Cookies</div>
+          </div>
+          <div class="layer">
+            <div class="lnum">04</div>
+            <div class="ltitle">Common Utilities</div>
+            <div class="ldesc">Error types · Logger · Buffer · PathUtils · Constants</div>
+          </div>
+        </div>
+        <div class="kicker">Each layer is independent and testable in isolation — that is what makes the test strategy
+          possible.</div>
+        <span class="slide-no">05 / 15</span>
+      </section>
+
+      <!-- 06 CODE REVIEW & QUALITY -->
+      <section data-transition="fade">
+        <div class="slide-mark">Code Review</div>
+        <h2>Who reviews — and what we check</h2>
+        <div class="two-col">
+          <div class="list-col">
+            <div class="l-eyebrow">Reviewers</div>
+            <h3>Why us, mutually</h3>
+            <ul>
+              <li>Pair team: both of us own the whole codebase</li>
+              <li>Every PR reviewed by the other before merge</li>
+              <li>Natural choice — small team, shared responsibility</li>
+              <li>Bugs discussed in PR comments &amp; on Discord</li>
+            </ul>
+          </div>
+          <div class="list-col">
+            <div class="l-eyebrow">What we look for</div>
+            <h3>The review checklist</h3>
+            <ul>
+              <li>Logic correctness &amp; edge cases</li>
+              <li>Structure, readability, naming</li>
+              <li>Error handling — no <code>unwrap</code> in hot paths</li>
+              <li>Tests added or updated for the change</li>
+              <li>Green CI — clippy <code>-D warnings</code> · <code>fmt --check</code></li>
+            </ul>
+          </div>
+        </div>
+        <div class="kicker">Two reviewers, one quality bar — nothing lands on main without a second pair of eyes.</div>
+        <span class="slide-no">06 / 15</span>
+      </section>
+
+      <!-- 07 SECTION DIVIDER: TESTING -->
+      <section data-transition="fade">
+        <div class="section">
+          <div class="num">Part 01 — Testing</div>
+          <h1>Test strategy<br>&amp; planning</h1>
+          <div class="lead">A layered test strategy covering protocol behaviour, configuration, error paths, CGI, and
+            load.</div>
+        </div>
+        <span class="slide-no">07 / 15</span>
+      </section>
+
+      <!-- 08 FIVE TEST CATEGORIES -->
+      <section data-transition="fade">
+        <div class="slide-mark">Testing · Strategy</div>
+        <h2>Five categories — each tied to a real risk</h2>
+        <div class="layers">
+          <div class="layer">
+            <div class="lnum">01</div>
+            <div class="ltitle">Integration / E2E</div>
+            <div class="ldesc">Real sockets · methods, routing, uploads, status codes — what the client actually sees
+            </div>
+          </div>
+          <div class="layer">
+            <div class="lnum">02</div>
+            <div class="ltitle">Configuration</div>
+            <div class="ldesc">Parsing, defaults, validation, multi-server setups, malformed config</div>
+          </div>
+          <div class="layer">
+            <div class="lnum">03</div>
+            <div class="ltitle">Error paths</div>
+            <div class="ldesc">Invalid requests, oversized bodies, header limits — server must not crash</div>
+          </div>
+          <div class="layer">
+            <div class="lnum">04</div>
+            <div class="ltitle">CGI</div>
+            <div class="ldesc">Script lifecycle, env vars, stdin/stdout piping, timeouts</div>
+          </div>
+          <div class="layer">
+            <div class="lnum">05</div>
+            <div class="ltitle">Stress &amp; chunking</div>
+            <div class="ldesc">Concurrent connections under load · chunked-encoding bodies — event-loop stability</div>
+          </div>
+        </div>
+        <div class="kicker">My main contributions: request parsing &amp; response logic tests, plus verifying bug fixes.
+        </div>
+        <span class="slide-no">08 / 15</span>
+      </section>
+
+      <!-- 09 TEST COVERAGE MAP -->
+      <section data-transition="fade">
+        <div class="slide-mark">Testing · Files</div>
+        <h2>Where each category lives in the repo</h2>
+        <table class="table">
+          <tr>
+            <th style="width:32%">File</th>
+            <th style="width:22%">Type</th>
+            <th>Coverage</th>
+          </tr>
+          <tr>
+            <td><code>integration_tests.rs</code></td>
+            <td class="muted">E2E</td>
+            <td>HTTP methods, routes, uploads, status codes</td>
+          </tr>
+          <tr>
+            <td><code>config_tests.rs</code></td>
+            <td class="muted">Integration</td>
+            <td>Config parsing &amp; validation</td>
+          </tr>
+          <tr>
+            <td><code>error_tests.rs</code></td>
+            <td class="muted">Integration</td>
+            <td>Malformed requests, edge cases, safe failure</td>
+          </tr>
+          <tr>
+            <td><code>cgi_tests.rs</code></td>
+            <td class="muted">Integration</td>
+            <td>CGI script execution &amp; timeouts</td>
+          </tr>
+          <tr>
+            <td><code>stress_tests.rs</code></td>
+            <td class="muted">Load</td>
+            <td>Concurrent connections under sustained load</td>
+          </tr>
+          <tr>
+            <td><code>chunking_tests.rs</code></td>
+            <td class="muted">Protocol</td>
+            <td>Chunked transfer-encoding, large bodies</td>
+          </tr>
+        </table>
+        <div class="kicker">Standard <code>cargo test</code> — no custom harness. One command runs everything.</div>
+        <span class="slide-no">09 / 15</span>
+      </section>
+
+      <!-- 10 MANUAL VS AUTOMATED -->
+      <section data-transition="fade">
+        <div class="slide-mark">Testing · Manual vs Automated</div>
+        <h2>When to automate, when to do it by hand</h2>
+        <div class="two-col">
+          <div class="list-col">
+            <div class="l-eyebrow">Automated · stable logic</div>
+            <h3>Run it on every commit</h3>
+            <ul>
+              <li>Request parsing &amp; response serialization</li>
+              <li>Error paths &amp; protocol edge cases</li>
+              <li>Config validation · CGI lifecycle</li>
+              <li>Documented inside test files; executed via <code>cargo test</code></li>
+              <li>Catches regressions before they reach a PR</li>
+            </ul>
+          </div>
+          <div class="list-col">
+            <div class="l-eyebrow">Manual · user-facing behaviour</div>
+            <h3>What automation misses</h3>
+            <ul>
+              <li class="warn">Real browser behaviour — Chrome, Firefox, Safari</li>
+              <li class="warn"><code>curl</code> probes for headers, cookies, redirects</li>
+              <li class="warn">Upload &amp; delete flows on the real filesystem</li>
+              <li class="warn">Custom error pages rendered visually</li>
+              <li class="warn">Documented in PR comments &amp; issues with steps + expected result</li>
+            </ul>
+          </div>
+        </div>
+        <div class="kicker">Results are shared on GitHub PRs and Discord — bugs reproduced, discussed, fixed, then
+          merged.</div>
+        <span class="slide-no">10 / 15</span>
+      </section>
+
+      <!-- 11 SECTION DIVIDER: CI -->
+      <section data-transition="fade">
+        <div class="section">
+          <div class="num">Part 02 — CI</div>
+          <h1>Continuous<br>Integration</h1>
+          <div class="lead">CI as a quality contract: every change is built, linted, formatted, tested, and measured
+            before it can land.</div>
+        </div>
+        <span class="slide-no">11 / 15</span>
+      </section>
+
+      <!-- 12 WHY CI -->
+      <section data-transition="fade">
+        <div class="slide-mark">CI · Why it matters</div>
+        <h2>What CI does for the codebase</h2>
+        <div class="values">
+          <div class="value">
+            <div class="vidx">01 · QUALITY GATE</div>
+            <div class="vtitle">Nothing reaches main unchecked</div>
+            <div class="vdesc">Build, lint, format, and the full test suite must pass for every push and PR. Regressions
+              caught before review.</div>
+          </div>
+          <div class="value">
+            <div class="vidx">02 · FAST FEEDBACK</div>
+            <div class="vtitle">Minutes, not days</div>
+            <div class="vdesc">A complete pipeline run finishes in roughly four minutes. The author sees impact while
+              context is fresh.</div>
+          </div>
+          <div class="value">
+            <div class="vidx">03 · REPRODUCIBILITY</div>
+            <div class="vtitle">The same checks for everyone</div>
+            <div class="vdesc">CI runs on a clean Linux environment with the stable toolchain. "Works on my machine"
+              stops being useful.</div>
+          </div>
+          <div class="value">
+            <div class="vidx">04 · SAFETY NET</div>
+            <div class="vtitle">Confident refactoring</div>
+            <div class="vdesc">With every commit verified end-to-end, restructuring internals becomes routine instead of
+              a risk.</div>
+          </div>
+        </div>
+        <span class="slide-no">12 / 15</span>
+      </section>
+
+      <!-- 13 PIPELINE STAGES -->
+      <section data-transition="fade">
+        <div class="slide-mark">CI · Pipeline</div>
+        <h2>Pipeline stages — every push, every PR</h2>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="fnum">01</div>
+            <div class="fbody">
+              <div class="ftitle">CHECKOUT</div>
+              <div class="fdesc">Pull commit, set up stable Rust toolchain</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="fnum">02</div>
+            <div class="fbody">
+              <div class="ftitle">CHECK</div>
+              <div class="fdesc"><code>cargo check</code> — fast type/borrow validation</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="fnum">03</div>
+            <div class="fbody">
+              <div class="ftitle">CLIPPY</div>
+              <div class="fdesc">Lint with <code>-D warnings</code> — every warning fails</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="fnum">04</div>
+            <div class="fbody">
+              <div class="ftitle">FMT</div>
+              <div class="fdesc"><code>cargo fmt --check</code> — uniform style</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="fnum">05</div>
+            <div class="fbody">
+              <div class="ftitle">TEST</div>
+              <div class="fdesc"><code>cargo test --include-ignored</code> — full suite</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="fnum">06</div>
+            <div class="fbody">
+              <div class="ftitle">COVERAGE</div>
+              <div class="fdesc"><code>cargo tarpaulin</code> → codecov upload</div>
+            </div>
+          </div>
+        </div>
+        <div class="kicker">Each stage is fail-fast. A red signal stops the pipeline at the earliest possible point.
+        </div>
+        <span class="slide-no">13 / 15</span>
+      </section>
+
+      <!-- 14 CI CONFIG + RESULTS -->
+      <section data-transition="fade">
+        <div class="slide-mark">CI · Config &amp; Results</div>
+        <h2>The pipeline in YAML — and what it reports</h2>
+        <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start">
+          <div class="code-block">
+            <div class="code-bar"><span class="dots"><i></i><i></i><i></i></span>.github/workflows/ci.yml</div>
+            <div class="code-content"><span class="key">name</span>: CI<br><br><span class="key">on</span>: [push,
+              pull_request]<br><br><span class="key">jobs</span>:<br>&nbsp;&nbsp;<span
+                class="yel">test</span>:<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">runs-on</span>:
+              macos-latest<br>&nbsp;&nbsp;&nbsp;&nbsp;<span
+                class="key">steps</span>:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">uses</span>:
+              actions/checkout@v3<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">uses</span>:
+              dtolnay/rust-toolchain@stable<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">run</span>: cargo
+              check<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">run</span>: cargo clippy <span
+                class="com">-- -D warnings</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">run</span>:
+              cargo fmt <span class="com">--check</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span
+                class="key">run</span>: cargo test <span
+                class="com">--include-ignored</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span
+                class="key">run</span>: cargo tarpaulin <span class="com">--out
+                Xml</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">uses</span>:
+              codecov/codecov-action@v3</div>
+          </div>
+          <table class="table">
+            <tr>
+              <th>Signal</th>
+              <th>State</th>
+            </tr>
+            <tr>
+              <td>Test suite</td>
+              <td><span class="tag good">100% GREEN</span></td>
+            </tr>
+            <tr>
+              <td>Clippy warnings</td>
+              <td><span class="tag good">0</span></td>
+            </tr>
+            <tr>
+              <td>Format check</td>
+              <td><span class="tag good">CLEAN</span></td>
+            </tr>
+            <tr>
+              <td>Pipeline time</td>
+              <td><span class="tag good">~4 min</span></td>
+            </tr>
+            <tr>
+              <td>Coverage</td>
+              <td><span class="tag good">CODECOV</span></td>
+            </tr>
+
+          </table>
+        </div>
+        <span class="slide-no">14 / 15</span>
+      </section>
+
+
+
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      width: 1280,
+      height: 800,
+      margin: 0.04,
+      minScale: 0.2,
+      maxScale: 2.0,
+      center: true,
+      hash: true,
+      controls: true,
+      progress: true,
+      transition: 'fade',
+      backgroundTransition: 'fade',
+      keyboard: true
+    });
+  </script>
+</body>
+
+</html>
