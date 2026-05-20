@@ -168,7 +168,7 @@
 
       .presenters {
         position: absolute;
-        bottom: 20px;
+        bottom: 150px;
         left: 0;
         right: 0;
         text-align: center;
@@ -739,7 +739,7 @@
             <div class="stat">
               <div class="num">~4 min</div>
               <div class="label">CI pipeline</div>
-              <div class="desc">Check · lint · fmt · test · cov</div>
+              <div class="desc">Lint · build · test</div>
             </div>
           </div>
           <div class="kicker">
@@ -749,34 +749,7 @@
           <span class="slide-no">02 / 15</span>
         </section>
 
-        <!-- 03 COLLABORATION & COMMUNICATION -->
-        <section data-transition="fade">
-          <div class="slide-mark">Collaboration</div>
-          <h2>How we communicate — and why each channel</h2>
-          <div class="two-col">
-            <div class="list-col">
-              <div class="l-eyebrow">Fast &amp; informal</div>
-              <h3>Discord &amp; WhatsApp</h3>
-              <ul>
-                <li>Quick coordination, status checks, "I'm stuck" pings</li>
-                <li>Voice when debugging together in real time</li>
-                <li style="--accent: var(--purple);">Downside: messages get lost, no record</li>
-              </ul>
-            </div>
-            <div class="list-col">
-              <div class="l-eyebrow">Durable &amp; technical</div>
-              <h3>GitHub &amp; email</h3>
-              <ul>
-                <li>Pull requests with line-level review &amp; discussion</li>
-                <li>Issues for bug reports &amp; reproduction steps</li>
-                <li>Everything stays documented and searchable</li>
-              </ul>
-            </div>
-          </div>
-          <span class="slide-no">03 / 15</span>
-        </section>
-
-        <!-- 04 REQUIREMENTS & DOCS -->
+        <!-- 03 REQUIREMENTS & DOCS -->
         <section data-transition="fade">
           <div class="slide-mark">Requirements &amp; Docs</div>
           <h2>Functional requirements &amp; how docs mirror them</h2>
@@ -816,53 +789,10 @@
             Each requirement maps to a documented section — and to a handler in
             code.
           </div>
-          <span class="slide-no">04 / 15</span>
+          <span class="slide-no">03 / 15</span>
         </section>
 
-        <!-- 05 ARCHITECTURE -->
-        <section data-transition="fade">
-          <div class="slide-mark">Architecture</div>
-          <h2>Four layers, clear contracts</h2>
-          <div class="layers">
-            <div class="layer">
-              <div class="lnum">01</div>
-              <div class="ltitle">Core Layer</div>
-              <div class="ldesc">
-                EventLoop (kqueue · epoll) · EventManager · Poller · Connection
-                · Socket
-              </div>
-            </div>
-            <div class="layer">
-              <div class="lnum">02</div>
-              <div class="ltitle">Application Layer</div>
-              <div class="ldesc">
-                ServerManager · Router · 8 Request Handlers · CGI · Config
-              </div>
-            </div>
-            <div class="layer">
-              <div class="lnum">03</div>
-              <div class="ltitle">HTTP Layer</div>
-              <div class="ldesc">
-                Parser (state machine) · Serializer · Request/Response · Headers
-                · Cookies
-              </div>
-            </div>
-            <div class="layer">
-              <div class="lnum">04</div>
-              <div class="ltitle">Common Utilities</div>
-              <div class="ldesc">
-                Error types · Logger · Buffer · PathUtils · Constants
-              </div>
-            </div>
-          </div>
-          <div class="kicker">
-            Each layer is independent and testable in isolation — that is what
-            makes the test strategy possible.
-          </div>
-          <span class="slide-no">05 / 15</span>
-        </section>
-
-        <!-- 06 CODE REVIEW & QUALITY -->
+        <!-- 04 CODE REVIEW & QUALITY -->
         <section data-transition="fade">
           <div class="slide-mark">Code Review</div>
           <h2>Who reviews — and what we check</h2>
@@ -892,10 +822,37 @@
               </ul>
             </div>
           </div>
-          <span class="slide-no">06 / 15</span>
+          <span class="slide-no">04 / 15</span>
         </section>
 
-        <!-- 07 SECTION DIVIDER: TESTING -->
+        <!-- 05 COLLABORATION & COMMUNICATION -->
+        <section data-transition="fade">
+          <div class="slide-mark">Collaboration</div>
+          <h2>How we communicate — and why each channel</h2>
+          <div class="two-col">
+            <div class="list-col">
+              <div class="l-eyebrow">Fast &amp; informal</div>
+              <h3>Discord &amp; WhatsApp</h3>
+              <ul>
+                <li>Quick coordination, status checks, "I'm stuck" pings</li>
+                <li>Voice when debugging together in real time</li>
+                <li style="--accent: var(--purple);">Downside: messages get lost, no record</li>
+              </ul>
+            </div>
+            <div class="list-col">
+              <div class="l-eyebrow">Durable &amp; technical</div>
+              <h3>GitHub &amp; email</h3>
+              <ul>
+                <li>Pull requests with line-level review &amp; discussion</li>
+                <li>Each PR ships with the test that proves the change</li>
+                <li>Everything stays documented and searchable</li>
+              </ul>
+            </div>
+          </div>
+          <span class="slide-no">05 / 15</span>
+        </section>
+
+        <!-- 06 SECTION DIVIDER: TESTING -->
         <section data-transition="fade">
           <div class="section">
             <div class="num">Part 01 — Testing</div>
@@ -905,10 +862,10 @@
               configuration, error paths, CGI, and load.
             </div>
           </div>
-          <span class="slide-no">07 / 15</span>
+          <span class="slide-no">06 / 15</span>
         </section>
 
-        <!-- 08 FIVE TEST CATEGORIES -->
+        <!-- 07 FIVE TEST CATEGORIES -->
         <section data-transition="fade">
           <div class="slide-mark">Testing · Strategy</div>
           <h2>Five categories we have tested</h2>
@@ -953,10 +910,10 @@
               </div>
             </div>
           </div>
-          <span class="slide-no">08 / 15</span>
+          <span class="slide-no">07 / 15</span>
         </section>
 
-        <!-- 09 TEST COVERAGE MAP -->
+        <!-- 08 TEST COVERAGE MAP -->
         <section data-transition="fade">
           <div class="slide-mark">Testing · Files</div>
           <h2>Where each category lives in the repo</h2>
@@ -1001,57 +958,55 @@
             We use the built-in Rust testing tool. One simple command runs all
             our tests automatically.
           </div>
-          <span class="slide-no">09 / 15</span>
+          <span class="slide-no">08 / 15</span>
         </section>
 
-        <!-- 10 MANUAL VS AUTOMATED -->
+        <!-- 09 REPORTING & RESULTS (bridge: manual + cargo test → CI) -->
         <section data-transition="fade">
-          <div class="slide-mark">Testing · Manual vs Automated</div>
-          <h2>When to automate, when to do it by hand</h2>
+          <div class="slide-mark">Reporting &amp; Results</div>
+          <h2>
+            What manual probing and <code>cargo test</code> proved — before we
+            automated anything
+          </h2>
           <div class="two-col">
             <div class="list-col">
-              <div class="l-eyebrow">Automated · stable logic</div>
-              <h3>Run it on every commit</h3>
+              <div class="l-eyebrow">Manual exploration</div>
+              <h3>Verified by hand on a real server</h3>
               <ul>
-                <li>Request parsing &amp; response serialization</li>
-                <li>Error paths &amp; protocol edge cases</li>
-                <li>Config validation · CGI lifecycle</li>
                 <li>
-                  Documented inside test files; executed via
-                  <code>cargo test</code>
+                  Status codes covered — 200, 301, 302, 400, 403, 404, 405,
+                  413, 500
                 </li>
-                <li>Catches regressions before they reach a PR</li>
+                <li>Upload &amp; DELETE round-trip on the real filesystem</li>
+                <li>CGI scripts — query string, request body, chunked input</li>
+                <li>
+                  Multi-port &amp; virtual-host routing via
+                  <code>curl --resolve</code>
+                </li>
+                <li>Custom error pages render correctly in Chrome &amp; Firefox</li>
               </ul>
             </div>
             <div class="list-col">
-              <div class="l-eyebrow">Manual · user-facing behaviour</div>
-              <h3>What automation misses</h3>
+              <div class="l-eyebrow"><code>cargo test</code> · local run</div>
+              <h3>Pinned as repeatable suites</h3>
               <ul>
-                <li class="warn">
-                  Real browser behaviour — Chrome, Firefox, Safari
-                </li>
-                <li class="warn">
-                  <code>curl</code> probes for headers, cookies, redirects
-                </li>
-                <li class="warn">
-                  Upload &amp; delete flows on the real filesystem
-                </li>
-                <li class="warn">Custom error pages rendered visually</li>
-                <li class="warn">
-                  Documented in PR comments &amp; issues with steps + expected
-                  result
-                </li>
+                <li>Unit tests — parser, router, status, validator</li>
+                <li>Integration — methods, routes, uploads, error paths</li>
+                <li>CGI — chunked &amp; unchunked bodies, timeouts</li>
+                <li>Config — parsing, validation, virtual-host conflicts</li>
+                <li>Stress — burst traffic, event-loop stability</li>
               </ul>
             </div>
           </div>
           <div class="kicker">
-            Results are shared on GitHub PRs and Discord — bugs reproduced,
-            discussed, fixed, then merged.
+            Both methods catch real bugs — but each one only protects the
+            developer who ran it. Every commit needs the same guarantee →
+            that is the job of CI.
           </div>
-          <span class="slide-no">10 / 15</span>
+          <span class="slide-no">09 / 15</span>
         </section>
 
-        <!-- 11 SECTION DIVIDER: CI -->
+        <!-- 10 SECTION DIVIDER: CI -->
         <section data-transition="fade">
           <div class="section">
             <div class="num">Part 02 — CI</div>
@@ -1061,10 +1016,10 @@
               formatted, tested, and measured before it can land.
             </div>
           </div>
-          <span class="slide-no">11 / 15</span>
+          <span class="slide-no">10 / 15</span>
         </section>
 
-        <!-- 12 WHY CI -->
+        <!-- 11 WHY CI -->
         <section data-transition="fade">
           <div class="slide-mark">CI · Why it matters</div>
           <h2>What CI does for the codebase</h2>
@@ -1101,10 +1056,10 @@
               </div>
             </div>
           </div>
-          <span class="slide-no">12 / 15</span>
+          <span class="slide-no">11 / 15</span>
         </section>
 
-        <!-- 13 PIPELINE STAGES -->
+        <!-- 12 PIPELINE STAGES -->
         <section data-transition="fade">
           <div class="slide-mark">CI · Pipeline</div>
           <h2>Pipeline stages — every push, every PR</h2>
@@ -1154,24 +1109,15 @@
                 </div>
               </div>
             </div>
-            <div class="flow-step">
-              <div class="fnum">06</div>
-              <div class="fbody">
-                <div class="ftitle">COVERAGE</div>
-                <div class="fdesc">
-                  <code>cargo tarpaulin</code> → codecov upload
-                </div>
-              </div>
-            </div>
           </div>
           <div class="kicker">
             Each stage is fail-fast. A red signal stops the pipeline at the
             earliest possible point.
           </div>
-          <span class="slide-no">13 / 15</span>
+          <span class="slide-no">12 / 15</span>
         </section>
 
-        <!-- 14 CI CONFIG + RESULTS -->
+        <!-- 13 CI CONFIG + RESULTS -->
         <section data-transition="fade">
           <div class="slide-mark">CI · Config &amp; Results</div>
           <h2>The pipeline in YAML — and what it reports</h2>
@@ -1207,12 +1153,7 @@
                 <span class="com">--check</span
                 ><br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-
                 <span class="key">run</span>: cargo test
-                <span class="com">--include-ignored</span
-                ><br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-
-                <span class="key">run</span>: cargo tarpaulin
-                <span class="com">--out Xml</span
-                ><br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-
-                <span class="key">uses</span>: codecov/codecov-action@v3
+                <span class="com">--include-ignored</span>
               </div>
             </div>
             <table class="table">
@@ -1236,16 +1177,12 @@
                 <td>Pipeline time</td>
                 <td><span class="tag good">~4 min</span></td>
               </tr>
-              <tr>
-                <td>Coverage</td>
-                <td><span class="tag good">CODECOV</span></td>
-              </tr>
             </table>
           </div>
-          <span class="slide-no">14 / 15</span>
+          <span class="slide-no">13 / 15</span>
         </section>
 
-        <!-- 15 CI SECURITY -->
+        <!-- 14 CI SECURITY -->
         <section data-transition="fade">
           <div class="slide-mark">CI · Security</div>
           <h2>Security scanning &amp; audit</h2>
@@ -1298,6 +1235,41 @@
                 <td><span class="tag good">WEEKLY</span></td>
               </tr>
             </table>
+          </div>
+          <span class="slide-no">14 / 15</span>
+        </section>
+
+        <!-- 15 SUMMARY: TWO LANES, ONE QUALITY STORY -->
+        <section data-transition="fade">
+          <div class="slide-mark">Summary</div>
+          <h2>Two lanes — one quality story</h2>
+          <div class="two-col">
+            <div class="list-col">
+              <div class="l-eyebrow">Automated lane · what CI delivered</div>
+              <h3>Every commit, same guarantee</h3>
+              <ul>
+                <li>Parser, router, status, validator — frozen as <code>cargo test</code> suites</li>
+                <li>Integration, CGI, config &amp; stress runs on every push</li>
+                <li>Clippy <code>-D warnings</code> and <code>fmt --check</code> keep style coherent</li>
+                <li>Pipeline finishes in ~4 minutes — feedback while context is fresh</li>
+                <li>Reviewers trust the green tick before reading code</li>
+              </ul>
+            </div>
+            <div class="list-col">
+              <div class="l-eyebrow">Manual lane · what humans still catch</div>
+              <h3>The things CI cannot see</h3>
+              <ul>
+                <li class="warn">Real browser behaviour — Chrome, Firefox, Safari</li>
+                <li class="warn">Visual rendering of error pages &amp; directory listings</li>
+                <li class="warn">Upload &amp; delete flows against a real filesystem</li>
+                <li class="warn">Exploratory <code>curl</code> probes for the unexpected</li>
+                <li class="warn">Bugs documented in PR comments with steps + expected result</li>
+              </ul>
+            </div>
+          </div>
+          <div class="kicker">
+            Automated catches the regressions. Manual catches the surprises.
+            Together they are what makes us confident to merge.
           </div>
           <span class="slide-no">15 / 15</span>
         </section>
