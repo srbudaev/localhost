@@ -32,7 +32,8 @@ fn test_single_server_single_port() {
 
     assert!(response.contains("HTTP/1.1"));
     assert!(response.contains("200") || response.contains("OK"));
-    println!("RESPONSE: {:?}", response); assert!(response.contains("Test"));
+    println!("RESPONSE: {:?}", response);
+    assert!(response.contains("Test"));
 }
 
 #[test]
@@ -82,7 +83,8 @@ fn test_post_request() {
 
     let response = send_request(port, &request);
 
-    println!("RESPONSE: {:?}", response); assert!(response.contains("200") || response.contains("201"));
+    println!("RESPONSE: {:?}", response);
+    assert!(response.contains("200") || response.contains("201"));
 }
 
 #[test]
@@ -162,7 +164,8 @@ fn test_method_not_allowed() {
     let request = "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n";
     let response = send_request(port, request);
 
-    println!("RESPONSE: {:?}", response); assert!(response.contains("405"));
+    println!("RESPONSE: {:?}", response);
+    assert!(response.contains("405"));
 }
 
 #[test]
