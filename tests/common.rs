@@ -85,15 +85,18 @@ fn ensure_connection_close(request: &str) -> String {
     }
 }
 
-/// Start test server in background thread
-/// Note: ServerManager is created inside the thread to avoid Send requirement
-/// since it contains Rc<Poller> which is not Send.
-#[allow(dead_code)] // Used in integration_tests.rs and error_tests.rs
-pub fn start_test_server(port: u16, body_size: usize) -> thread::JoinHandle<()> {
-    let config = create_test_config(port, body_size);
-
+/// Start test server in background thread using an explicit config
+#[allow(dead_code)]
+pub fn start_test_server_with_config(config: Config) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut server_manager = ServerManager::new(config).unwrap();
         let _ = server_manager.run();
     })
+}
+
+/// Start test server in background thread using a default test config
+#[allow(dead_code)] // Used in integration_tests.rs and error_tests.rs
+pub fn start_test_server(port: u16, body_size: usize) -> thread::JoinHandle<()> {
+    let config = create_test_config(port, body_size);
+    start_test_server_with_config(config)
 }
