@@ -168,7 +168,7 @@
 
       .presenters {
         position: absolute;
-        bottom: 20px;
+        bottom: 150px;
         left: 0;
         right: 0;
         text-align: center;
@@ -760,7 +760,9 @@
               <ul>
                 <li>Quick coordination, status checks, "I'm stuck" pings</li>
                 <li>Voice when debugging together in real time</li>
-                <li style="--accent: var(--purple);">Downside: messages get lost, no record</li>
+                <li style="--accent: var(--purple)">
+                  Downside: messages get lost, no record
+                </li>
               </ul>
             </div>
             <div class="list-col">
@@ -795,7 +797,7 @@
                   Many clients without blocking · keep-alive &amp; clean close
                 </li>
                 <li>Uploads, deletion, CGI, custom error pages</li>
-                <li style="--accent: var(--purple);">
+                <li style="--accent: var(--purple)">
                   Handle invalid requests safely — never crash
                 </li>
               </ul>
@@ -1263,12 +1265,18 @@
                 >.github/workflows/security.yml
               </div>
               <div class="code-content">
-                <span class="key">name</span>: Security audit<br /><br /><span class="key"
+                <span class="key">name</span>: Security audit<br /><br /><span
+                  class="key"
                   >on</span
                 >:<br />&nbsp;&nbsp;<span class="key">schedule</span
-                >:<br />&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">cron</span>: <span class="str">"0 6 * * 1"</span><br />&nbsp;&nbsp;<span class="key">push</span
-                >:<br />&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">paths</span
-                >: [ <span class="str">"Cargo.lock"</span> ]<br /><br /><span class="key">jobs</span
+                >:<br />&nbsp;&nbsp;&nbsp;&nbsp;- <span class="key">cron</span>:
+                <span class="str">"0 6 * * 1"</span><br />&nbsp;&nbsp;<span
+                  class="key"
+                  >push</span
+                >:<br />&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">paths</span>:
+                [ <span class="str">"Cargo.lock"</span> ]<br /><br /><span
+                  class="key"
+                  >jobs</span
                 >:<br />&nbsp;&nbsp;<span class="yel">cargo-audit</span
                 >:<br />&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">runs-on</span
                 >: macos-latest<br />&nbsp;&nbsp;&nbsp;&nbsp;<span class="key"
@@ -1292,7 +1300,7 @@
                 <td>Yanked crates</td>
                 <td><span class="tag good">PASSED</span></td>
               </tr>
-              
+
               <tr>
                 <td>Schedule</td>
                 <td><span class="tag good">WEEKLY</span></td>
