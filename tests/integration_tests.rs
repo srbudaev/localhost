@@ -9,7 +9,7 @@ use std::time::Duration;
 use localhost::application::config::models::RouteConfig;
 
 mod common;
-use common::{create_test_config, send_request, start_test_server};
+use common::{create_test_config, send_request, start_test_server_with_config};
 
 #[test]
 #[ignore] // Ignore by default - requires server to be running
@@ -23,16 +23,16 @@ fn test_single_server_single_port() {
     fs::write(&test_file, "<html><body>Test</body></html>").unwrap();
 
     // Start server
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500)); // Wait for server to start
 
-    // Send GET request
-    let request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    // Send GET request for the specific file so directory listing isn't triggered
+    let request = "GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n";
     let response = send_request(port, request);
 
     assert!(response.contains("HTTP/1.1"));
     assert!(response.contains("200") || response.contains("OK"));
-    assert!(response.contains("Test"));
+    println!("RESPONSE: {:?}", response); assert!(response.contains("Test"));
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_get_request() {
     let test_file = test_root.join("test.txt");
     fs::write(&test_file, "Hello, World!").unwrap();
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     let request = "GET /test.txt HTTP/1.1\r\nHost: localhost\r\n\r\n";
@@ -70,19 +70,19 @@ fn test_post_request() {
     let upload_dir = test_root.join("uploads");
     fs::create_dir_all(&upload_dir).unwrap();
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     let body = "test data";
     let request = format!(
-        "POST /upload.txt HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{}",
+        "POST /upload.txt HTTP/1.1\r\nHost: localhost\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
         body.len(),
         body
     );
 
     let response = send_request(port, &request);
 
-    assert!(response.contains("200") || response.contains("201"));
+    println!("RESPONSE: {:?}", response); assert!(response.contains("200") || response.contains("201"));
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn test_delete_request() {
     let test_file = test_root.join("delete_me.txt");
     fs::write(&test_file, "delete me").unwrap();
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     // DELETE request
@@ -112,9 +112,9 @@ fn test_delete_request() {
 #[ignore]
 fn test_not_found() {
     let port = 8084;
-    let _config = create_test_config(port, 1024 * 1024);
+    let config = create_test_config(port, 1024 * 1024);
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     let request = "GET /nonexistent.txt HTTP/1.1\r\nHost: localhost\r\n\r\n";
@@ -127,9 +127,9 @@ fn test_not_found() {
 #[ignore]
 fn test_body_size_limit() {
     let port = 8085;
-    let _config = create_test_config(port, 100); // Small limit
+    let config = create_test_config(port, 100); // Small limit
 
-    let _server_thread = start_test_server(port, 100);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     // Send request with body larger than limit
@@ -155,14 +155,14 @@ fn test_method_not_allowed() {
         route.methods = vec!["GET".to_string()];
     }
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
-    // Try POST on GET-only route
-    let request = "POST / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    // Try POST on GET-only route (provide Content-Length: 0 to avoid timeouts)
+    let request = "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n";
     let response = send_request(port, request);
 
-    assert!(response.contains("405"));
+    println!("RESPONSE: {:?}", response); assert!(response.contains("405"));
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn test_directory_listing() {
     fs::create_dir_all(&subdir).unwrap();
     fs::write(subdir.join("file.txt"), "content").unwrap();
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     let request = "GET /subdir/ HTTP/1.1\r\nHost: localhost\r\n\r\n";
@@ -202,7 +202,7 @@ fn test_default_file() {
     let index_file = test_root.join("index.html");
     fs::write(&index_file, "<html>Index</html>").unwrap();
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     // Request directory, should serve index.html
@@ -233,7 +233,7 @@ fn test_redirect() {
         },
     );
 
-    let _server_thread = start_test_server(port, 1024 * 1024);
+    let _server_thread = start_test_server_with_config(config.clone());
     thread::sleep(Duration::from_millis(500));
 
     let request = "GET /old HTTP/1.1\r\nHost: localhost\r\n\r\n";

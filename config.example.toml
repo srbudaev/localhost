@@ -75,7 +75,7 @@ default_file = "index_new.html"
 server_address = "127.0.0.1"
 
 # Listen on port 8081
-ports = [8080]
+ports = [8081]
 
 # Server name for Host header matching
 server_name = "anotherhost"
